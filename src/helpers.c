@@ -339,9 +339,9 @@ double calculate_percentage(double base_value, double part_value)
 
 void loop_items_calculate_percentage(Items it[], int index, double base_value)
 {
-    if (index > 3)
+    if (index > TOP_SIZE)
     {
-        index = 3;
+        index = TOP_SIZE;
     }
 
     for (int i = 0; i < index; i++)

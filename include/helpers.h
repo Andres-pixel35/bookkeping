@@ -5,6 +5,7 @@
 #include "struct.h"
 
 extern const char *BASE_PATH;
+#define TOP_SIZE 3
 
 bool match_wildcard(const char *pattern, const char *str);
 int has_files_wildcard(const char *pattern);

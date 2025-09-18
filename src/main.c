@@ -16,7 +16,6 @@
 #define FIRST_MONTH 1     // i need to check if the current month is 12, if so then I have to set it to 12 and reduce the year by 1
 #define MAX_LEN_DOUBLE 15 // if you realy have this amount of money, I don't know what are you doing here
 #define MAX_ITEMS 100 // the max number of items the user would be able to enter
-#define TOP_SIZE 3
 #define SAVINGS_WITHDRAWS_SIZE 3
 
 // Sets is_valid = false and breaks out of the current block/loop.

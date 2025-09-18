@@ -328,7 +328,7 @@ void compare_items(Items top[], Items new[], int *index)
     int real_index = *index - 1; 
     Items temp = new[real_index]; // new item
 
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < TOP_SIZE; i++)
     {
         if (top[i].value < temp.value)
         {
@@ -502,9 +502,9 @@ double write_keydrivers_items(FILE *file, const char *item, double value, double
 double loop_write_keydrivers_items(FILE *file, Items it[], int index)
 {
     double check = 0;
-    if (index > 3)
+    if (index > TOP_SIZE)
     {
-        index = 3;
+        index = TOP_SIZE;
     }
 
     for (int i = 0; i < index; i++)
