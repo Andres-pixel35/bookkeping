@@ -1,0 +1,41 @@
+(test file)
+
+Withdrawals from Savings
+
+- Savings: $3.00
+Travels: $1.00
+Planned purchases: $1.00
+Emergencies: $1.00
+
+Personal Finance Report
+
+- Total income: $1230.00
+gifts: $50.00
+freelance: $100.00
+commissions: $200.00
+wage: $1000.00
+Previous balance: $-120.00
+
+- Total expenses: $820.00
+snacks: $20.00
+food: $100.00
+mobile: $200.00
+rent: $500.00
+
+- Debts: $350.00
+credit card: $50.00
+friends: $100.00
+loan: $200.00
+
+- Savings: $30.00
+Travels: $20.00
+Planned purchases: $0.00
+Emergencies: $10.00
+
+- Investment: $50.00
+Real estate: $0.00
+Currencies (forex): $0.00
+Commodities: $20.00
+Stocks: $30.00
+
+- Final balance: $-20.00

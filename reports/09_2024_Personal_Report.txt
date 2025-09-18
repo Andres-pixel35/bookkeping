@@ -1,0 +1,34 @@
+(test file)
+
+Personal Finance Report
+
+- Total income: $1430.00
+gifts: $10.00
+freelance: $100.00
+commissions: $200.00
+wage: $1000.00
+Previous balance: $120.00
+
+- Total expenses: $600.00
+snacks: $50.00
+food: $100.00
+mobile: $150.00
+rent: $300.00
+
+- Debts: $350.00
+friends: $50.00
+credit card: $100.00
+loan: $200.00
+
+- Savings: $6.00
+Travels: $2.00
+Planned purchases: $2.00
+Emergencies: $2.00
+
+- Investment: $4.00
+Real estate: $1.00
+Currencies (forex): $1.00
+Commodities: $1.00
+Stocks: $1.00
+
+- Final balance: $470.00
