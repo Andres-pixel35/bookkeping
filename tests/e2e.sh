@@ -128,6 +128,22 @@ run $ERR_CATEGORY 'y\n' categories delete "Emergency fund"
 run 0 '' list
 run 0 '' summary
 
+# 6b. the menu's add loop: many entries of one type in a row, done goes back to the list of types (not the main menu),
+#     the date of each entry defaults to the previous one, and a refused withdrawal doesn't end the loop
+mkdir "$DIR/loop"
+LOOP_INPUT='\ny\n0\nPiggy bank\n100\n\n\n'           # wizard: one saving category, no investments
+LOOP_INPUT="$LOOP_INPUT"'1\n2\ncoffee\n3.50\n03\nlunch\n12\n\n\n'  # Add entries > Expense: two items, the 2nd keeps day 03, done
+LOOP_INPUT="$LOOP_INPUT"'4\n1\n20\n04\nPiggy bank\n5\n\n\n'      # Saving deposit by number and by name, done
+LOOP_INPUT="$LOOP_INPUT"'5\n1\n500\n05\n\n'                      # Saving withdrawal over the balance: refused, still in the loop
+LOOP_INPUT="$LOOP_INPUT"'9\n8\n'                                    # back to the main menu, quit
+BOOKKEEPING_DIR="$DIR/loop" run 0 "$LOOP_INPUT"
+contains "$DIR/loop/data/$M.csv" "1,$M-03,expense,,coffee,350"
+contains "$DIR/loop/data/$M.csv" "2,$M-03,expense,,lunch,1200"
+contains "$DIR/loop/data/$M.csv" "3,$M-04,saving,Piggy bank,,2000"
+contains "$DIR/loop/data/$M.csv" "4,$M-04,saving,Piggy bank,,500"
+lacks "$DIR/loop/data/$M.csv" "saving-withdraw"
+[ "$(grep -c "What do you want to record?" "$OUT")" -eq 4 ] || fail "the list of entry types was not shown again after each loop"
+
 # 7. the end of the input never hangs: at the menu it is a normal exit, in the middle of an edit it is ERR_EOF
 run 0 ''
 run $ERR_EOF '' edit 1

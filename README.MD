@@ -22,9 +22,6 @@ Only the C standard library and POSIX are used (no ncurses, no readline, no data
 ```
 bookkeping/
 ├── Makefile
-├── docs/
-│   ├── SPEC.md          (the specification of this rework)
-│   └── DECISIONS.md     (the decisions taken while implementing it)
 ├── include/
 │   ├── cli.h  errors.h  finance.h  helpers.h  ledger.h  report.h  struct.h
 ├── src/
@@ -82,7 +79,7 @@ Nothing is written until the last answer, so an interrupted wizard leaves no hal
 The header shows the open month with your cash, incomes and expenses so far, then:
 
 ```
-  1) Add entry
+  1) Add entries
   2) View month so far
   3) Edit entry
   4) Delete entry
@@ -92,7 +89,9 @@ The header shows the open month with your cash, incomes and expenses so far, the
   8) Quit
 ```
 
-Each action returns to the menu. Prompts show the expected format, and the default between brackets: Enter accepts it. When an answer is wrong the prompt says why and asks again. Ctrl-D (end of input) at the menu quits; in the middle of an action it stops that action (nothing of it is saved, everything before it is safe).
+Each action returns to the menu, and every screen starts with its own title so the output of one action is easy to tell from the next.
+
+**Adding entries:** choose *Add entries*, then the type (income, expense, saving deposit…). You can then record as many entries of that type as you want, one after the other; each one is saved as soon as it is complete. Press Enter (or write `done`) at the item name or category prompt when you are finished: you go back to the list of types, where you can pick another type or *Back to the main menu*. The first date defaults to today and every next one to the date of the previous entry, so a batch of receipts from the same day only needs the date once. Prompts show the expected format, and the default between brackets: Enter accepts it. When an answer is wrong the prompt says why and asks again. Ctrl-D (end of input) at the menu quits; in the middle of an action it stops that action (nothing of it is saved, everything before it is safe).
 
 ### Quick commands
 
