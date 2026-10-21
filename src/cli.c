@@ -275,7 +275,7 @@ static int ask_name(const char *prompt, const char *default_name, char *name)
             return status;
         }
 
-        if (checK_item(input))
+        if (check_item(input))
         {
             snprintf(name, MAX_NAME_LEN + 1, "%s", input);
             free(input);
@@ -904,7 +904,7 @@ static int wizard_categories(Book *book, CategoryKind kind)
             return 0;
         }
 
-        if (!checK_item(input) || find_category(book, input) >= 0)
+        if (!check_item(input) || find_category(book, input) >= 0)
         {
             if (find_category(book, input) >= 0)
             {
@@ -1043,7 +1043,7 @@ static int command_add(Book *book, int argc, char **argv)
         }
         snprintf(entry.category, sizeof(entry.category), "%s", book->categories[index].name);
     }
-    else if (!checK_item(positional[1]))
+    else if (!check_item(positional[1]))
     {
         return usage("invalid item name");
     }
@@ -1124,7 +1124,7 @@ static int command_categories(Book *book, int argc, char **argv)
         }
         if (strlen(argv[2]) > MAX_NAME_LEN)
         {
-            checK_item(argv[2]); // explains the limit
+            check_item(argv[2]); // explains the limit
             return ERR_USAGE;
         }
         if (argc == 4 && parse_opening(argv[3], &category.opening) != 0)
@@ -1139,7 +1139,7 @@ static int command_categories(Book *book, int argc, char **argv)
         status = lookup_category(book, argv[1], &index);
         if (status == 0 && strlen(argv[2]) > MAX_NAME_LEN)
         {
-            checK_item(argv[2]);
+            check_item(argv[2]);
             status = ERR_USAGE;
         }
         if (status == 0)

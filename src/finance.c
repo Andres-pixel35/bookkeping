@@ -456,7 +456,7 @@ int rename_category(Book *book, size_t index, const char *new_name)
     char old_name[MAX_NAME_LEN + 1];
     Category *category = &book->categories[index];
 
-    if (!checK_item(new_name))
+    if (!check_item(new_name))
     {
         return ERR_USAGE;
     }

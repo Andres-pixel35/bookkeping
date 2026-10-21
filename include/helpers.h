@@ -23,7 +23,7 @@ int check_choose(char *choose);
 int ask_choose(const char *question, char default_answer, bool *yes);
 int ask_sign(bool *negative);
 int ask_amount(const char *prompt, const char *default_value, bool allow_zero, long long *cents);
-bool checK_item(const char *buffer);
+bool check_item(const char *buffer);
 bool check_month(int *variable);
 int parse_amount(const char *text, long long *cents, const char **why);
 void format_money(long long cents, bool show_plus, char *out, size_t size);

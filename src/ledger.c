@@ -210,7 +210,7 @@ static bool parse_number(const char *text, long long *value)
     return true;
 }
 
-// the same rules as checK_item, but quiet: a bad name in a data file is reported once as a malformed file
+// the same rules as check_item, but quiet: a bad name in a data file is reported once as a malformed file
 static bool valid_name(const char *name)
 {
     size_t len = strlen(name);
@@ -713,7 +713,7 @@ int ledger_delete_entry(Book *book, size_t index)
 
 int ledger_add_category(Book *book, const Category *category)
 {
-    if (!checK_item(category->name))
+    if (!check_item(category->name))
     {
         return ERR_USAGE;
     }

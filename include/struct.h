@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#define MAX_NAME_LEN 50 // the same limit checK_item has always used for item names
+#define MAX_NAME_LEN 50 // the same limit check_item has always used for item names
 #define SIZE_DIR_NAME 256 // the data directory, the file names are built on top of it
 
 // every amount in the program is stored as integer cents (long long), so no floating point drift can ever change a balance

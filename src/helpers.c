@@ -147,7 +147,7 @@ int ask_choose(const char *question, char default_answer, bool *yes)
 }
 
 // it checks the len of the item and return true if it's lower than 50, false otherwise
-bool checK_item(const char *buffer)
+bool check_item(const char *buffer)
 {
     size_t len = strlen(buffer);
 

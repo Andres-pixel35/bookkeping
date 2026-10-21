@@ -71,7 +71,7 @@
 
 ### Storage
 14. **RFC 4180 quoting** was chosen over rejecting characters, so `food, snacks` and `say "hi"` work. Names still
-    can't contain control characters (newline, tab…): `checK_item` refuses them because they would break the
+    can't contain control characters (newline, tab…): `check_item` refuses them because they would break the
     Markdown tables. The reader still understands quoted newlines.
 15. **Column use:** `type` holds the quick-command keyword (`income`, `expense`, `debt`, `saving`, `saving-withdraw`,
     `invest`, `invest-withdraw`, `invest-value`). Income/expense/debt entries leave `category` empty; saving and
@@ -137,3 +137,5 @@
     adapted where the code changed (e.g. the `get_values_double` comment now describes `parse_amount`, the
     `update_savings` one describes `check_balances`). Comments describing removed code (the `.txt` parsing, the
     wildcard search, the `HANDLE_*` macros, the old one-shot flow of `main`) went away with that code.
+39. **`checK_item` renamed `check_item`.** The capital K was a typo that broke the snake_case rule of SPEC 2.3; the
+    function and its comment are otherwise unchanged. Decisions above that mention it now use the new name.
