@@ -2,7 +2,9 @@
 # End-to-end test: drives the real binary through the setup wizard (piped stdin) and the quick commands
 # inside a temporary BOOKKEEPING_DIR, closes the month and checks both Markdown reports.
 #
-# usage: sh tests/e2e.sh path/to/bookkeeping
+# usage: sh tests/e2e.sh path/to/bookkeeping [path/to/release/bookkeeping]
+# The optional release binary (built without sanitizers, which can't run under ulimit -v) is used for the
+# out-of-memory check.
 # Set E2E_DIR to keep the data directory (and its reports) somewhere instead of a removed mktemp -d.
 
 set -u
@@ -187,7 +189,23 @@ contains "$DIR/data/state.csv" ",276500"
 run $ERR_DATE 'y\n' close
 run $ERR_DATE '' add expense food 5 --date "$M-10"
 
-# 11. no ANSI escape codes when stdout is not a terminal
+# 11. review bug 7: a real memory error in the middle of the wizard stops it, no later prompt runs and nothing is saved
+RELEASE=${2:-}
+case $RELEASE in
+    ''|/*) ;;
+    *) RELEASE=$(pwd)/$RELEASE ;;
+esac
+if [ -n "$RELEASE" ]; then
+    mkdir "$DIR/oom"
+    ( ulimit -v 60000; head -c 120000000 /dev/zero | tr '\0' a | BOOKKEEPING_DIR="$DIR/oom" timeout 20 "$RELEASE" >"$DIR/oom.log" 2>&1 )
+    code=$?
+    [ "$code" -eq 205 ] || fail "out of memory in the wizard exited with $code, expected 205 (ERR_MEMORY)"
+    contains "$DIR/oom.log" "Could not allocate memory"
+    lacks "$DIR/oom.log" "Opening cash"
+    [ -e "$DIR/oom/data/state.csv" ] && fail "a memory error in the wizard left a data/state.csv"
+fi
+
+# 12. no ANSI escape codes when stdout is not a terminal
 ESC=$(printf '\033')
 if grep -q "$ESC" "$OUT"; then fail "the output contains ANSI escape codes although it is not a terminal"; fi
 

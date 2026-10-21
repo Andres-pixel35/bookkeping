@@ -410,7 +410,7 @@ static int read_csv_file(const char *path, const char *header, RecordHandler han
     {
         status = 0;
     }
-    else if (status == ERR_FILE)
+    else if (status == ERR_FILE) // if one value is missing it returns ERR_FILE and stops the program, it can't continue without it
     {
         missing_values(path);
     }
@@ -507,6 +507,7 @@ int write_file_atomic(const char *path, int (*writer)(FILE *, const void *), con
         return ERR_FILE;
     }
 
+    // it's necessary to check that the writing worked: ferror says whether any of the fprintf calls failed
     int status = writer(file, context);
     if (status == 0 && (fflush(file) != 0 || ferror(file) || fsync(fileno(file)) != 0))
     {

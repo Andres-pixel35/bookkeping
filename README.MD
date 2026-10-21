@@ -273,7 +273,7 @@ Refer to [`include/errors.h`](include/errors.h) if you want to change their valu
 
 ## Tests
 
-`make test` runs the unit tests (`tests/test_*.c`, plain `assert`) and `tests/e2e.sh`, which drives the real binary through the wizard and the quick commands in a temporary `BOOKKEEPING_DIR` and checks both reports. Everything is built with `-fsanitize=address,undefined`, so any leak or undefined behaviour fails the run. `E2E_DIR=/some/dir sh tests/e2e.sh build/test/bookkeeping` keeps the generated data and reports to look at.
+`make test` runs the unit tests (`tests/test_*.c`, plain `assert`) and `tests/e2e.sh`, which drives the real binary through the wizard and the quick commands in a temporary `BOOKKEEPING_DIR` and checks both reports. Everything is built with `-fsanitize=address,undefined`, so any leak or undefined behaviour fails the run. The release binary is used once, under `ulimit -v`, to check that a real out-of-memory error stops the program cleanly (sanitizers can't run with that limit). `E2E_DIR=/some/dir sh tests/e2e.sh build/test/bookkeeping` keeps the generated data and reports to look at.
 
 ---
 

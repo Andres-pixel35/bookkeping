@@ -133,3 +133,7 @@
     then the command. `help` works without setup.
 36. **Confirmations** (delete entry, delete category, close) default to "n"; piping `y` works for scripts.
 37. **Menu option input** must be a number in range; any other input re-prompts saying what was expected.
+38. **Comments.** Every original comment whose code survives is kept: word for word where the code is unchanged,
+    adapted where the code changed (e.g. the `get_values_double` comment now describes `parse_amount`, the
+    `update_savings` one describes `check_balances`). Comments describing removed code (the `.txt` parsing, the
+    wildcard search, the `HANDLE_*` macros, the old one-shot flow of `main`) went away with that code.

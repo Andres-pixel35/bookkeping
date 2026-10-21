@@ -433,6 +433,7 @@ int aggregate_items(const Book *book, EntryType type, Items **items, size_t *cou
         array[j].value += entry->amount;
     }
 
+    // get the percentage each item represents of its type
     Items *array = list;
     for (size_t i = 0; i < used; i++)
     {
@@ -515,6 +516,7 @@ int check_category_delete(const Book *book, size_t index)
 // the closing balances of this month are the opening balances of the next one, and the next month starts with no entries
 void carry_forward(Book *book, const MonthSummary *summary)
 {
+    // update the value of every saving and investment adding to the previous one what happened this month
     for (size_t i = 0; i < book->category_count; i++)
     {
         book->categories[i].opening = summary->categories[i].closing;

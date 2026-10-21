@@ -70,7 +70,7 @@ static void summary_row(FILE *file, const char *label, long long cents, const lo
 {
     fprintf(file, "| %s |", label);
     md_money(file, cents, false);
-    if (incomes != NULL)
+    if (incomes != NULL) // calculate the percentage that each total represents of the income
     {
         fprintf(file, " %.2f%% |\n", calculate_percentage(*incomes, cents));
     }
@@ -331,6 +331,7 @@ static int write_personal_report(FILE *file, const void *data)
     return status;
 }
 
+// from here forth everything is done in order to write the keydrivers file
 static int write_key_drivers(FILE *file, const void *data)
 {
     const ReportContext *context = data;

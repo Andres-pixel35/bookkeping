@@ -934,7 +934,7 @@ static int wizard_categories(Book *book, CategoryKind kind)
 static int run_wizard(Book *book)
 {
     char month[SIZE_PROMPT];
-    bool negative = false;
+    bool negative = false; // to know the sign of the opening cash, if necessary
     long long cash = 0;
     int year = 0;
     int number = 0;
@@ -946,6 +946,7 @@ static int run_wizard(Book *book)
     printf("%s=== Welcome to the setup for new users ===%s\nNo data was found in \"%s/data\", let's set things up.\n"
            "(Run \"bookkeeping help\" any time to see how everything works.)\n\n", paint(COLOR_BOLD), paint(COLOR_RESET), book->dir);
 
+    // a loop to ask for the month until the user writes the required input, aka "YYYY-MM" with a month between 1 and 12
     while (1)
     {
         char *input = NULL;

@@ -440,6 +440,7 @@ int parse_month(const char *text, int *year, int *month)
 {
     size_t len = strlen(text);
 
+    // I decided to check the size to ensure that it never overflows the atoi
     if (len != MAX_LEN_YEAR + 1 + MAX_LEN_MONTH || text[MAX_LEN_YEAR] != '-' || !all_digits(text, 0, MAX_LEN_YEAR)
         || !all_digits(text, MAX_LEN_YEAR + 1, len))
     {
@@ -455,7 +456,7 @@ int parse_month(const char *text, int *year, int *month)
         return ERR_USAGE;
     }
 
-    if (y == 0)
+    if (y == 0) // the program won't work with years Before the Common Era
     {
         err_year();
         return ERR_YEAR;
