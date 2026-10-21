@@ -1,142 +1,232 @@
 # Bookkeeping CLI Application
 
-This is a C-based command-line bookkeeping application designed to help users track their monthly finances, including incomes, expenses, debts, savings, and investments. The program generates detailed reports for each month and maintains continuity by reading data from previous months.
+This is a C-based command-line bookkeeping application to track your money day by day: incomes, expenses, debts, and your own saving and investment categories. Exactly one month is *open* at a time; when you decide it's over you close it, and the program writes two Markdown reports and carries every balance forward to the next month.
+
+Only the C standard library and POSIX are used (no ncurses, no readline, no database).
 
 ---
 
 ## Features
 
-- **Monthly Data Entry:**  
-  Enter detailed lists of incomes, expenses, and debts for each month, with support for up to 100 items per category.
-
-- **Savings & Investments Tracking:**  
-  Track savings for specific goals (travels, planned purchases, emergencies) and investments (real estate, currencies, commodities, stocks).
-
-- **Withdrawals from Savings:**  
-  Record money withdrawn from savings for various purposes.
-  > *Withdrawals from investments are not yet supported.*
-
-- **Automatic Report Generation:**  
-  Generates two types of reports for each month:
-  - **Personal Report:** Detailed breakdown of all financial activities.
-  - **Key Drivers Report:** Highlights top contributors in each category and provides percentage breakdowns.
-
-- **Continuity:**  
-  Reads previous month's data to maintain running totals for savings and investments.
-
-- **User-Friendly Input:**  
-  Prompts guide the user through all required data entry, with validation and error handling.
+- **Daily recording:** add entries on any day, in any session, from an interactive menu or with one-line quick commands.
+- **Your own categories:** create, rename and delete saving categories (e.g. an emergency fund) and investment categories (e.g. an index fund). Nothing is hard-coded.
+- **Investments at market value:** record what an investment is worth whenever you like; the reports show the gain or loss and the return % of each one.
+- **Fix mistakes before closing:** list the entries with their IDs, edit any field, delete entries, rename categories, fix opening balances.
+- **Month close:** a preview, a y/n confirmation, then two `.md` reports (`reports/MM_YYYY_Personal_Report.md` and `reports/MM_YYYY.md`) that render well on GitHub.
+- **Safe money data:** amounts are integer cents (no floating-point drift), files are rewritten through a temporary file + `rename()`, and closed months are never edited again.
 
 ---
 
 ## Directory Structure
 
 ```
-program/
+bookkeping/
+├── Makefile
+├── docs/
+│   ├── SPEC.md          (the specification of this rework)
+│   └── DECISIONS.md     (the decisions taken while implementing it)
 ├── include/
-│   ├── errors.h
-│   ├── finance.h
-│   ├── helpers.h
-│   └── struct.h
-├── reports/
-│   ├── 01_2024_Personal_Report.txt
-│   ├── 01_2024.txt
-│   └── ... (all your monthly reports)
+│   ├── cli.h  errors.h  finance.h  helpers.h  ledger.h  report.h  struct.h
 ├── src/
-│   ├── errors.c
-│   ├── finance.c
-│   ├── helpers.c
-│   └── main.c
+│   ├── main.c     (hands the arguments to the CLI, returns its exit code)
+│   ├── cli.c      (menu, quick commands, setup wizard, help)
+│   ├── ledger.c   (CSV files: loading, appending, safe rewrites)
+│   ├── finance.c  (categories, entries, month totals, investment gains)
+│   ├── report.c   (Markdown reports and month close)
+│   ├── helpers.c  (input, money parsing/formatting, dates, colors)
+│   └── errors.c   (error messages)
+├── tests/
+│   ├── test_money.c  test_ledger.c  test_finance.c  test_report.c  test_util.h
+│   └── e2e.sh
+├── data/      (your data, git-ignored: only .gitkeep is tracked)
+└── reports/   (your reports, git-ignored: only .gitkeep is tracked)
 ```
 
-> **Important:**  
-> Before running the program for the first time, make sure to remove all example files from the `reports/` directory (or your chosen `BASE_PATH`). This ensures the program starts with a clean slate and works as expected for new users.
+> The contents of `data/` and `reports/` are personal financial data and are ignored by git, so they never end up on GitHub.
 
 ---
 
-## How It Works
-
-1. **Startup:**  
-    The program checks for existing monthly report files in the directory specified by `BASE_PATH` (default: `reports/`) to determine if this is the user's first run or a continuation. You can change `BASE_PATH` in the code to use a different directory for your reports.
-
-2. **User Prompts:**  
-   - Enter the month and year for bookkeeping.
-   - If not the first run, previous month's data is loaded for continuity.
-   - Enter previous balances, savings, and investments if applicable.
-   - Enter current month's incomes, expenses, debts, savings, investments, and any withdrawals from savings.
-
-   > **Note:** Withdrawing money from **investments** is not yet supported. You can only record withdrawals from savings at this time.
-
-3. **Data Validation:**  
-   - Input is validated for correct format, length, and logical consistency.
-   - Errors are reported with clear messages.
-
-4. **Report Generation:**  
-   - Two files are created in `reports/`:
-     - `MM_YYYY_Personal_Report.txt`: Full breakdown.
-     - `MM_YYYY.txt`: Key drivers and summary.
-
----
-
-## Usage
-
-### Compilation
-
-Compile the program using `gcc` (or any C99-compatible compiler):
+## Build
 
 ```sh
-gcc -o bookkeeping src/*.c -Iinclude
+make            # release build: ./bookkeeping (-O2)
+make debug      # build/debug/bookkeeping with -g and the address/undefined sanitizers
+make test       # unit tests + tests/e2e.sh, all built with -fsanitize=address,undefined -g
+make clean      # removes everything that was built
 ```
 
-### Running
+It compiles without warnings with `-std=c11 -Wall -Wextra -Wpedantic`.
 
-Run the program from the root directory:
+---
+
+## First run: the setup wizard
+
+The first time (when there is no `data/state.csv`) the program asks:
+
+1. **The first month to track** (`YYYY-MM`, default: the current month).
+2. **The opening cash**: the money you have at the start of that month besides savings and investments. It can be negative (the wizard asks whether it's a positive amount).
+3. **Your saving categories** with their balance at the start of the month, and then **your investment categories** with their total value at the start of the month. Add as many as you want (or none); write `done` (or just press Enter) to finish each list.
+
+Nothing is written until the last answer, so an interrupted wizard leaves no half setup behind.
+
+---
+
+## Daily use
+
+### Interactive menu
 
 ```sh
 ./bookkeeping
 ```
 
-Follow the on-screen prompts to enter your financial data for the month.
+The header shows the open month with your cash, incomes and expenses so far, then:
+
+```
+  1) Add entry
+  2) View month so far
+  3) Edit entry
+  4) Delete entry
+  5) Categories
+  6) Close month
+  7) Help
+  8) Quit
+```
+
+Each action returns to the menu. Prompts show the expected format, and the default between brackets: Enter accepts it. When an answer is wrong the prompt says why and asks again. Ctrl-D (end of input) at the menu quits; in the middle of an action it stops that action (nothing of it is saved, everything before it is safe).
+
+### Quick commands
+
+| Command | What it does |
+|---|---|
+| `bookkeeping add <type> <item\|category> <amount> [--date YYYY-MM-DD]` | Records an entry (see the types below). |
+| `bookkeeping list` | Every entry of the open month, day by day, with its ID. |
+| `bookkeeping summary` | Totals of the open month so far, with every category. |
+| `bookkeeping edit <id>` | Changes any field of an entry (Enter keeps the current value). |
+| `bookkeeping delete <id>` | Deletes an entry (asks y/n). |
+| `bookkeeping categories` | Your categories with their opening balance and their balance now. |
+| `bookkeeping categories add <saving\|investment> <name> [<opening amount>]` | New category. |
+| `bookkeeping categories rename <old> <new>` | Renames it everywhere in the open month. |
+| `bookkeeping categories delete <name>` | Only when it started the month at 0 and has no entries (asks y/n). |
+| `bookkeeping categories set-opening <name> <amount>` | Fixes the opening balance (or value) of a category. |
+| `bookkeeping opening-cash [-]<amount>` | Fixes the opening cash of the open month. |
+| `bookkeeping close` | Preview, y/n confirmation, both reports, next month. |
+| `bookkeeping help` | The help text. |
+
+Entry types:
+
+| Type | Target | Meaning |
+|---|---|---|
+| `income`, `expense`, `debt` | an item name (free text) | Money in, money spent, debt paid. |
+| `saving` | a saving category | Deposit: cash → saving. |
+| `saving-withdraw` | a saving category | Withdrawal: saving → cash. |
+| `invest` | an investment category | Contribution: cash → investment. |
+| `invest-withdraw` | an investment category | Withdrawal: investment → cash. |
+| `invest-value` | an investment category | What the investment is worth today (see below). |
+
+Examples:
+
+```sh
+./bookkeeping add expense food 25000
+./bookkeeping add expense "food, snacks" 12.50 --date 2026-10-14
+./bookkeeping add income salary 3000 --date 1        # day 1 of the open month
+./bookkeeping add saving "Emergency fund" 300
+./bookkeeping add invest "Index fund" 200
+./bookkeeping add invest-value "Index fund" 1260
+./bookkeeping list
+./bookkeeping edit 5
+```
+
+Names with spaces or commas go between quotes. The date defaults to today when today is inside the open month; otherwise you must give it (`--date`). Any day of the open month is accepted; dates outside it are refused. Invalid arguments print a usage line and return a non-zero exit code.
+
+If today is already past the open month, the program shows a notice suggesting you close it.
 
 ---
 
-## Input Details
+## Fixing mistakes before closing
 
-- **Incomes, Expenses, Debts:**  
-  Enter as many items as needed (up to 100 per category). For each, provide a name and value.
-
-- **Savings & Investments:**  
-  Enter amounts for each subcategory. If unchanged, enter `0` or press enter.
-
-- **Withdrawals:**  
-  Specify amounts withdrawn from each savings subcategory.
-
-- **Previous Data:**  
-  On first run, you may enter previous balances, savings, and investments to initialize the system.
+Everything in the open month can still change: list the entries (`list` or menu option 2) to see their IDs, then `edit <id>` (any field: type, item or category, amount, date) or `delete <id>`. Categories can be renamed (the entries follow the new name) and their opening balances fixed. A change is refused if it would make a withdrawal take more than its category had at that point of the month.
 
 ---
 
-## Output
+## Closing a month
 
-- **Personal Report (`MM_YYYY_Personal_Report.txt`):**  
-  - Lists all incomes, expenses, debts, savings, investments, and final balance.
-  - Shows withdrawals from savings if any.
+`bookkeeping close` (or menu option 6) shows the preview summary and asks for confirmation. Then it:
 
-- **Key Drivers Report (`MM_YYYY.txt`):**  
-  - Highlights TOP SIZE (default 3) items in incomes, expenses, and debts.
-  - Shows percentage breakdowns for each category.
-  - Summarizes savings and investments (add the previous one with the current one)
+1. writes `reports/MM_YYYY_Personal_Report.md` and `reports/MM_YYYY.md`,
+2. carries the closing cash and the closing balance/value of every category forward,
+3. opens the next month.
 
-> **Note about percentages in the reports:**  
-> - The percentage shown next to each item in incomes, expenses, or debts indicates the proportion that item represents within its own category (for example, an expense that is X% of total expenses).
-> - The total for **expenses** and **debts** also includes a percentage showing how much they represent relative to the total **incomes**.
+A month can be closed before it ends (the preview warns you), but not before it has started. A closed month is never edited again, and existing reports are never overwritten: the close is refused and explained instead.
 
 ---
 
-## Error Handling
+## Investments: value updates
 
-- All errors (file access, memory allocation, invalid input) are reported with descriptive messages.
-- The program ensures data integrity by validating all user input and file operations.
+Contributions and withdrawals only say how much money you moved. To know the gain or loss the program needs what the investment is **worth**, so from time to time record a **value update**:
+
+> Enter what this investment is worth today (what you put in + what it has earned or lost).
+
+This is the **total current value, including returns, interest and price changes** — not just the money you put in.
+
+Per investment category and month:
+
+```
+closing_value = the latest value update of the month, moved by the contributions and withdrawals dated after it
+                (with no value update: opening_value + contributions - withdrawals, so the gain is 0)
+gain          = closing_value - opening_value - contributions + withdrawals
+return %      = gain / (opening_value + contributions) x 100      (0 when that is 0)
+```
+
+Example: an index fund worth $1,000.00 at the start of the month, $200.00 contributed, and a value update of $1,260.00 → gain +$60.00, return +5.00%.
+
+---
+
+## Money formulas
+
+```
+closing_cash = opening_cash + incomes - expenses - debts
+             - saving_deposits + saving_withdrawals
+             - investment_contributions + investment_withdrawals
+
+net_worth    = cash + savings balances + investment values
+```
+
+- A withdrawal (from savings or investments) moves money back to your cash. If you spent it, also record that expense.
+- A withdrawal can never be more than the balance (or value) of that category at that point of the month.
+- The opening cash is shown on its own line, not mixed into the incomes. It may be negative.
+- Percentages are relative to the month's incomes (items inside a section: relative to that section).
+- Amounts are stored as integer cents. Input accepts `123`, `123.4` or `123.45` (at most two decimals, up to 15 characters, no sign or thousands separators). They are displayed like `$4,538,466.26`.
+
+---
+
+## Reports
+
+- **`reports/MM_YYYY_Personal_Report.md`** (full breakdown): a summary table (opening cash, incomes, expenses, debts, saved, withdrawn from savings, invested, withdrawn from investments, investment gain/loss, closing cash, net worth and its change), the incomes, expenses and debts aggregated by item name (case-insensitive) with %, the savings per category (opening, deposits, withdrawals, closing), the investments table above, and a day-by-day ledger of every entry.
+- **`reports/MM_YYYY.md`** (key drivers): the top `TOP_SIZE` incomes, expenses and debts aggregated by name with their % of the category, expenses and debts as % of incomes, % of incomes saved and invested, the gain/loss and return % of each investment and in total, and the net worth change.
+
+The reports are written for people. The program never reads them back: everything carried to the next month comes from the CSV files.
+
+---
+
+## File formats
+
+All files live inside the data directory: the current directory, or the one in `BOOKKEEPING_DIR`.
+
+| File | Content |
+|---|---|
+| `data/state.csv` | `open_month,opening_cash_cents` — e.g. `2026-10,100000` |
+| `data/categories.csv` | `kind,name,opening_balance_cents` — `kind` is `saving` or `investment`; balances/values at the start of the open month |
+| `data/YYYY-MM.csv` | `id,date,type,category,name,amount_cents` — one entry per line (`category` for saving/investment types, `name` for incomes, expenses and debts) |
+| `reports/*.md` | the generated reports |
+
+The CSV files have a header row and use RFC 4180 quoting: a field with a comma, a quote or a newline is quoted and its quotes doubled (`"food, snacks"`). New entries are appended and flushed at once; edits, deletes and the month close rewrite files through a temporary file in the same directory and `rename()`, so a crash never leaves a half-written file. Closed months keep their `data/YYYY-MM.csv` as history.
+
+---
+
+## Environment variables
+
+- **`BOOKKEEPING_DIR`**: the data directory (default `./`). It must exist; `data/` and `reports/` are created inside it when missing.
+- **`NO_COLOR`**: when set, no colors. Colors are also used only when the output is a terminal.
 
 ---
 
@@ -149,50 +239,44 @@ echo $?
 ```
 
 | Exit Code | Macro Name        | Description                                      |
-|-----------|------------------|--------------------------------------------------|
-| 0         | (Success)        | Success (no error)                               |
-| -51       | ERR_MEMORY       | Memory allocation error                          |
-| -52       | ERR_FILE         | File not found or cannot open file               |
-| -53       | ERR_DIC          | Dictionary file could not be opened              |
-| -54       | ERR_YEAR         | Invalid or missing year input                    |
-| -55       | ERR_CHOOSE       | Invalid menu or option selection                 |
-| -56       | ERR_NUMBER_ITEMS | Exceeded maximum number of allowed items         |
+|-----------|-------------------|--------------------------------------------------|
+| 0         | (Success)         | Success (no error)                               |
+| -51       | ERR_MEMORY        | Memory allocation error                          |
+| -52       | ERR_FILE          | A data file cannot be opened, written, or is malformed |
+| -53       | ERR_DIC           | The data directory (or `data/`, `reports/`) cannot be opened or created |
+| -54       | ERR_YEAR          | Invalid year (0000)                              |
+| -55       | ERR_CHOOSE        | Invalid y/n answer                               |
+| -56       | ERR_NUMBER_ITEMS  | Exceeded maximum number of allowed items (kept, no limit remains) |
+| -57       | ERR_EOF           | The input ended in the middle of an action       |
+| -58       | ERR_USAGE         | Invalid command-line arguments, amount or date format |
+| -59       | ERR_DATE          | Date outside the open month, no date given when today is outside it, or the month hasn't started (close) |
+| -60       | ERR_BALANCE       | A withdrawal would take more than the category has at that point |
+| -61       | ERR_CATEGORY      | Unknown or duplicate category, or a delete that isn't allowed |
+| -62       | ERR_REPORT_EXISTS | The reports of the month already exist (never overwritten) |
+| -63       | ERR_ENTRY         | No entry with that ID in the open month          |
 
 > **Note:**  
 > Since shell exit codes are unsigned 8-bit values, negative numbers will appear as their 256-based equivalent (e.g., `-51` appears as `205`).
 
 Refer to [`include/errors.h`](include/errors.h) if you want to change their values.
 
+---
 
 ## Customization
 
-- **Maximum Items:**  
-  Change `MAX_ITEMS` in [`src/main.c`](src/main.c) to allow more or fewer items per category.
-- **Report Directory:**  
-  Change `BASE_PATH` in [`src/helpers.c`](src/helpers.c) to use a different directory for reports.
-- **Top Items:**  
-  Change `TOP SIZE` in [`src/helpers.h`](include/helpers.h) to show a different amount of top items per category.
+- **Top items:** change `TOP_SIZE` in [`include/helpers.h`](include/helpers.h) (default 3) to show a different number of top items in the key drivers report.
+- **Maximum amount length:** `MAX_LEN_AMOUNT` in [`include/helpers.h`](include/helpers.h) (default 15 characters).
+- **Maximum name length:** `MAX_NAME_LEN` in [`include/struct.h`](include/struct.h) (default 50 characters).
+- **Data directory:** `BOOKKEEPING_DIR` (see above).
 
 ---
 
-## File Reference
+## Tests
 
-- **Main Logic:** [`src/main.c`](src/main.c)
-- **Finance Functions:** [`src/finance.c`](src/finance.c)
-- **Helpers & Utilities:** [`src/helpers.c`](src/helpers.c)
-- **Error Handling:** [`src/errors.c`](src/errors.c)
-- **Data Structures:** [`include/struct.h`](include/struct.h)
-
----
-
-## Example Reports
-
-See the `reports/` directory for sample output files.
+`make test` runs the unit tests (`tests/test_*.c`, plain `assert`) and `tests/e2e.sh`, which drives the real binary through the wizard and the quick commands in a temporary `BOOKKEEPING_DIR` and checks both reports. Everything is built with `-fsanitize=address,undefined`, so any leak or undefined behaviour fails the run. `E2E_DIR=/some/dir sh tests/e2e.sh build/test/bookkeeping` keeps the generated data and reports to look at.
 
 ---
 
 ## License
 
 This project is provided as-is for personal bookkeeping and educational purposes.
-
----
