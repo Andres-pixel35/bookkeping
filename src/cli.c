@@ -13,6 +13,8 @@
 #define MENU_OPTIONS 8
 #define CATEGORY_OPTIONS 6
 #define SIZE_PROMPT 256
+#define ADD_DONE 1 // the user answered "done": the loop of one entry type ends
+#define RULER "============================================================"
 
 static const char *USAGE =
     "Usage: bookkeeping [help | list | summary | close | edit <id> | delete <id>\n"
@@ -25,7 +27,9 @@ static const char *USAGE =
 static const char *HELP[] =
 {
     "Bookkeeping: record your money day by day and close each month into two Markdown reports.\n\n",
-    "Run it without arguments for the interactive menu, or use a quick command:\n\n",
+    "Run it without arguments for the interactive menu, or use a quick command.\n",
+    "In the menu, \"Add entries\" records as many entries of one type as you want, each one saved at once:\n",
+    "press enter (or write \"done\") at the item name or category prompt to go back to the list of types.\n\n",
     "  bookkeeping add <type> <item|category> <amount> [--date YYYY-MM-DD]\n",
     "      income | expense | debt <item>   free-form item name, e.g. add expense food 25000\n",
     "      saving <category>                deposit into a saving category (cash -> saving)\n",
@@ -70,6 +74,12 @@ static int usage(const char *why)
     wrong_arguments(why);
     fputs(USAGE, stderr);
     return ERR_USAGE;
+}
+
+// every screen of the menu starts with a title after a blank line, so the output of one action is easy to tell from the next
+static void print_title(const char *title)
+{
+    printf("\n%s--- %s ---%s\n\n", paint(COLOR_BOLD), title, paint(COLOR_RESET));
 }
 
 static void print_help(void)
@@ -159,7 +169,7 @@ static void print_category_balances(const Book *book, const MonthSummary *summar
     {
         bool any = false;
 
-        printf("%s%s categories%s (opening -> now):\n", paint(COLOR_BOLD), kind == KIND_SAVING ? "Saving" : "Investment", paint(COLOR_RESET));
+        printf("%s%s%s categories%s (opening -> now):\n", kind == KIND_SAVING ? "" : "\n", paint(COLOR_BOLD), kind == KIND_SAVING ? "Saving" : "Investment", paint(COLOR_RESET));
         for (size_t i = 0; i < book->category_count; i++)
         {
             if ((int)book->categories[i].kind != kind)
@@ -201,6 +211,7 @@ static void print_summary(const Book *book, const MonthSummary *s)
     print_line("Cash", s->closing_cash, false);
     print_line("Net worth", s->closing_net_worth, false);
     print_line("Net worth change", s->closing_net_worth - s->opening_net_worth, true);
+    printf("\n");
     print_category_balances(book, s);
 }
 
@@ -290,8 +301,8 @@ static bool category_listed(const Book *book, const CategoryKind *kind, size_t i
     return kind == NULL || book->categories[index].kind == *kind;
 }
 
-// lists the categories (of one kind, or all of them when kind is NULL) with a number, so the user can pick one by number or by name
-static int ask_category(const Book *book, const CategoryKind *kind, const char *default_name, size_t *index)
+// lists the categories (of one kind, or all of them when kind is NULL) with a number, and returns how many there are
+static size_t list_categories(const Book *book, const CategoryKind *kind)
 {
     size_t count = 0;
 
@@ -306,44 +317,61 @@ static int ask_category(const Book *book, const CategoryKind *kind, const char *
     if (count == 0)
     {
         printf("You have no %s categories yet, add one first in \"Categories\".\n", kind == NULL ? "" : kind_keyword(*kind));
+    }
+    return count;
+}
+
+// the user can pick a listed category by its number or by its name
+static int resolve_category(const Book *book, const CategoryKind *kind, const char *input, size_t *index)
+{
+    int number = 0;
+    int found = find_category(book, input);
+
+    if (parse_id(input, &number))
+    {
+        // the number is the position among the listed categories
+        for (size_t i = 0; i < book->category_count; i++)
+        {
+            if (category_listed(book, kind, i) && --number == 0)
+            {
+                *index = i;
+                return 0;
+            }
+        }
+    }
+    else if (found >= 0 && category_listed(book, kind, (size_t)found))
+    {
+        *index = (size_t)found;
+        return 0;
+    }
+
+    unknown_category(input, kind == NULL ? "saving or investment" : kind_keyword(*kind));
+    return ERR_CATEGORY;
+}
+
+static int ask_category(const Book *book, const CategoryKind *kind, const char *default_name, size_t *index)
+{
+    if (list_categories(book, kind) == 0)
+    {
         return ERR_CATEGORY;
     }
+    printf("\n");
 
     while (1)
     {
         char *input = NULL;
-        int number = 0;
         int status = prompt_line("Category (number or name)", default_name, &input);
         if (status != 0)
         {
             return status;
         }
 
-        int found = find_category(book, input);
-        if (parse_id(input, &number) && (size_t)number <= count)
-        {
-            // the number is the position among the listed categories
-            for (size_t i = 0; i < book->category_count; i++)
-            {
-                if (category_listed(book, kind, i) && --number == 0)
-                {
-                    *index = i;
-                }
-            }
-        }
-        else if (found >= 0 && category_listed(book, kind, (size_t)found))
-        {
-            *index = (size_t)found;
-        }
-        else
-        {
-            unknown_category(input, kind == NULL ? "saving or investment" : kind_keyword(*kind));
-            free(input);
-            continue;
-        }
-
+        status = resolve_category(book, kind, input, index);
         free(input);
-        return 0;
+        if (status == 0)
+        {
+            return 0;
+        }
     }
 }
 
@@ -391,15 +419,15 @@ static const char *amount_prompt(EntryType type)
     }
 }
 
-// asks every field of an entry. When editing, the current values are the defaults, so pressing enter keeps them
-static int ask_entry_fields(const Book *book, Entry *entry, bool editing)
+// asks every field of an entry that is being edited. The current values are the defaults, so pressing enter keeps them
+static int ask_entry_fields(const Book *book, Entry *entry)
 {
     Entry old = *entry;
     char amount[SIZE_MONEY];
     size_t index = 0;
     int status = 0;
 
-    while (editing)
+    while (1)
     {
         char *input = NULL;
         status = prompt_line("Type (income, expense, debt, saving, saving-withdraw, invest, invest-withdraw, invest-value)",
@@ -423,7 +451,7 @@ static int ask_entry_fields(const Book *book, Entry *entry, bool editing)
     if (type_uses_category(entry->type))
     {
         CategoryKind kind = type_kind(entry->type);
-        bool same_kind = editing && type_uses_category(old.type) && type_kind(old.type) == kind;
+        bool same_kind = type_uses_category(old.type) && type_kind(old.type) == kind;
 
         status = ask_category(book, &kind, same_kind ? old.category : NULL, &index);
         if (status != 0)
@@ -435,7 +463,7 @@ static int ask_entry_fields(const Book *book, Entry *entry, bool editing)
     }
     else
     {
-        status = ask_name("Item name (e.g. food)", (editing && !type_uses_category(old.type)) ? old.name : NULL, entry->name);
+        status = ask_name("Item name (e.g. food)", type_uses_category(old.type) ? NULL : old.name, entry->name);
         if (status != 0)
         {
             return status;
@@ -444,13 +472,13 @@ static int ask_entry_fields(const Book *book, Entry *entry, bool editing)
     }
 
     amount_to_text(old.amount, amount, sizeof(amount));
-    status = ask_amount(amount_prompt(entry->type), editing ? amount : NULL, entry->type == ENTRY_INVEST_VALUE, &entry->amount);
+    status = ask_amount(amount_prompt(entry->type), amount, entry->type == ENTRY_INVEST_VALUE, &entry->amount);
     if (status != 0)
     {
         return status;
     }
 
-    return ask_date(book, editing ? old.day : default_day(book), &entry->day);
+    return ask_date(book, old.day, &entry->day);
 }
 
 static int save_new_entry(Book *book, Entry *entry)
@@ -464,30 +492,137 @@ static int save_new_entry(Book *book, Entry *entry)
     return status;
 }
 
+// asks the item name (or the category) of the next entry of the loop; "done", the default, ends the loop with ADD_DONE
+static int ask_target(const Book *book, Entry *entry)
+{
+    CategoryKind kind = type_kind(entry->type);
+    bool uses_category = type_uses_category(entry->type);
+    size_t index = 0;
+
+    // the list is shown again for every entry, so the numbers are always on the screen
+    if (uses_category && list_categories(book, &kind) == 0)
+    {
+        return ERR_CATEGORY;
+    }
+
+    while (1)
+    {
+        char *input = NULL;
+        int status = prompt_line(uses_category ? "Category (number or name)" : "Item name (e.g. food)", "done", &input);
+        if (status != 0)
+        {
+            return status;
+        }
+
+        if (strcasecmp(input, "done") == 0)
+        {
+            status = ADD_DONE;
+        }
+        else if (uses_category)
+        {
+            status = resolve_category(book, &kind, input, &index);
+            if (status == 0)
+            {
+                snprintf(entry->category, sizeof(entry->category), "%s", book->categories[index].name);
+            }
+        }
+        else if (check_item(input))
+        {
+            snprintf(entry->name, sizeof(entry->name), "%s", input);
+        }
+        else
+        {
+            status = ERR_USAGE;
+        }
+
+        free(input);
+        if (status == 0 || status == ADD_DONE)
+        {
+            return status;
+        }
+    }
+}
+
+/**
+ * Records as many entries of one type as the user wants, each one saved as soon as it is complete,
+ * so adding ten expenses doesn't mean going back through the menus ten times.
+ * The first date defaults to today and every next one to the date of the previous entry (receipts of the same day).
+ *
+ * return 0 when the user answers "done", or the status that stopped the loop
+ */
+static int add_entries(Book *book, EntryType type)
+{
+    int day = default_day(book);
+
+    print_title(type_label(type));
+    printf("Add as many as you need, each one is saved at once.\n"
+           "Press enter (or write \"done\") at the %s prompt when you are finished.\n",
+           type_uses_category(type) ? "category" : "item name");
+
+    while (1)
+    {
+        Entry entry = { 0 };
+        entry.type = type;
+
+        printf("\n");
+        int status = ask_target(book, &entry);
+        if (status == ADD_DONE)
+        {
+            return 0;
+        }
+        if (status == 0)
+        {
+            status = ask_amount(amount_prompt(type), NULL, type == ENTRY_INVEST_VALUE, &entry.amount);
+        }
+        if (status == 0)
+        {
+            status = ask_date(book, day, &entry.day);
+        }
+        if (status == 0)
+        {
+            day = entry.day;
+            status = save_new_entry(book, &entry);
+        }
+
+        // a withdrawal over the balance was already explained and the loop goes on, anything else ends it
+        if (status != 0 && status != ERR_BALANCE)
+        {
+            return status;
+        }
+    }
+}
+
+// the list of entry types: after the loop of one type the user comes back here, not to the main menu
 static int menu_add(Book *book)
 {
-    Entry entry = { 0 };
-    int option = 0;
-
-    printf("What do you want to record?\n");
-    for (int i = 0; i < ENTRY_TYPE_COUNT; i++)
+    while (1)
     {
-        printf("  %d) %s\n", i + 1, type_label((EntryType)i));
-    }
+        int option = 0;
 
-    int status = ask_option("Choose an option [1-8]", ENTRY_TYPE_COUNT, &option);
-    if (status != 0)
-    {
-        return status;
-    }
-    entry.type = (EntryType)(option - 1);
+        print_title("Add entries");
+        printf("What do you want to record?\n");
+        for (int i = 0; i < ENTRY_TYPE_COUNT; i++)
+        {
+            printf("  %d) %s\n", i + 1, type_label((EntryType)i));
+        }
+        printf("  %d) Back to the main menu\n\n", ENTRY_TYPE_COUNT + 1);
 
-    status = ask_entry_fields(book, &entry, false);
-    if (status != 0)
-    {
-        return status;
+        int status = ask_option("Choose an option [1-9]", ENTRY_TYPE_COUNT + 1, &option);
+        if (status != 0)
+        {
+            return status;
+        }
+        if (option == ENTRY_TYPE_COUNT + 1)
+        {
+            return 0;
+        }
+
+        status = add_entries(book, (EntryType)(option - 1));
+        if (is_fatal(status))
+        {
+            return status;
+        }
     }
-    return save_new_entry(book, &entry);
 }
 
 static int edit_entry(Book *book, int id)
@@ -500,17 +635,18 @@ static int edit_entry(Book *book, int id)
     }
 
     Entry updated = book->entries[index];
-    printf("Editing (press enter to keep a value):\n");
+    printf("\nEditing (press enter to keep a value):\n");
     print_entry(book, &updated);
+    printf("\n");
 
-    int status = ask_entry_fields(book, &updated, true);
+    int status = ask_entry_fields(book, &updated);
     if (status == 0)
     {
         status = ledger_replace_entry(book, (size_t)index, &updated);
     }
     if (status == 0)
     {
-        printf("Updated:\n");
+        printf("\nUpdated:\n");
         print_entry(book, &book->entries[index]);
     }
     return status;
@@ -526,7 +662,9 @@ static int delete_entry(Book *book, int id)
         return ERR_ENTRY;
     }
 
+    printf("\n");
     print_entry(book, &book->entries[index]);
+    printf("\n");
     int status = ask_choose("Delete this entry?", 'n', &yes);
     if (status != 0)
     {
@@ -554,6 +692,7 @@ static int ask_entry_id(const Book *book, int *id)
         return status != 0 ? status : ERR_ENTRY;
     }
 
+    printf("\n");
     while (1)
     {
         char *input = NULL;
@@ -591,7 +730,7 @@ static int menu_category_add(Book *book)
     char prompt[SIZE_PROMPT];
     int option = 0;
 
-    printf("  1) Saving category\n  2) Investment category\n");
+    printf("\n  1) Saving category\n  2) Investment category\n\n");
     int status = ask_option("Kind [1-2]", 2, &option);
     if (status == 0)
     {
@@ -682,14 +821,16 @@ static int menu_categories(Book *book)
     while (1)
     {
         int option = 0;
+
+        print_title("Categories");
         int status = show_categories(book);
         if (status != 0)
         {
             return status;
         }
 
-        printf("  1) Add a category\n  2) Rename a category\n  3) Delete a category\n"
-               "  4) Fix the opening balance of a category\n  5) Fix the opening cash\n  6) Back\n");
+        printf("\n  1) Add a category\n  2) Rename a category\n  3) Delete a category\n"
+               "  4) Fix the opening balance of a category\n  5) Fix the opening cash\n  6) Back to the main menu\n\n");
         status = ask_option("Choose an option [1-6]", CATEGORY_OPTIONS, &option);
         if (status == 0)
         {
@@ -754,7 +895,7 @@ static int run_close(Book *book)
     print_summary(book, &summary);
     if (book->year == year && book->month == month)
     {
-        printf("%sNotice:%s the month is not over yet (today is day %d of %d). You can still close it now.\n",
+        printf("\n%sNotice:%s the month is not over yet (today is day %d of %d). You can still close it now.\n",
                paint(COLOR_BOLD), paint(COLOR_RESET), day, days_in_month(year, month));
     }
 
@@ -762,6 +903,7 @@ static int run_close(Book *book)
              book->year, book->month);
     build_report_paths(book, personal_report, key_drivers, SIZE_FILE_NAME);
 
+    printf("\n");
     status = ask_choose(question, 'n', &yes);
     if (status == 0 && !yes)
     {
@@ -795,18 +937,18 @@ static int run_menu(Book *book)
             return status;
         }
 
-        printf("\n%s=== Bookkeeping - %s %04d (open month) ===%s\nCash: ", paint(COLOR_BOLD), month_name(book->month), book->year,
-               paint(COLOR_RESET));
+        printf("\n\n%s%s\n Bookkeeping - %s %04d (open month)%s\n Cash: ", paint(COLOR_BOLD), RULER, month_name(book->month),
+               book->year, paint(COLOR_RESET));
         print_money(summary.closing_cash, false);
         printf("   Incomes: ");
         print_money(summary.incomes, false);
         printf("   Expenses: ");
         print_money(summary.expenses, false);
-        printf("\n");
+        printf("\n%s%s%s\n", paint(COLOR_BOLD), RULER, paint(COLOR_RESET));
         free_summary(&summary);
 
-        printf("  1) Add entry\n  2) View month so far\n  3) Edit entry\n  4) Delete entry\n"
-               "  5) Categories\n  6) Close month\n  7) Help\n  8) Quit\n");
+        printf("  1) Add entries\n  2) View month so far\n  3) Edit entry\n  4) Delete entry\n"
+               "  5) Categories\n  6) Close month\n  7) Help\n  8) Quit\n\n");
         status = ask_option("Choose an option [1-8]", MENU_OPTIONS, &option);
         if (status == ERR_EOF)
         {
@@ -825,14 +967,17 @@ static int run_menu(Book *book)
                 break;
 
             case 2:
+                print_title("Month so far");
                 status = show_summary(book);
                 if (status == 0)
                 {
+                    printf("\n");
                     status = print_entries(book);
                 }
                 break;
 
             case 3:
+                print_title("Edit entry");
                 status = ask_entry_id(book, &id);
                 if (status == 0)
                 {
@@ -841,6 +986,7 @@ static int run_menu(Book *book)
                 break;
 
             case 4:
+                print_title("Delete entry");
                 status = ask_entry_id(book, &id);
                 if (status == 0)
                 {
@@ -853,10 +999,12 @@ static int run_menu(Book *book)
                 break;
 
             case 6:
+                print_title("Close month");
                 status = run_close(book);
                 break;
 
             case 7:
+                print_title("Help");
                 print_help();
                 break;
 
@@ -878,11 +1026,11 @@ static int wizard_categories(Book *book, CategoryKind kind)
 
     if (kind == KIND_SAVING)
     {
-        printf("\nNow your saving categories (e.g. an emergency fund), with their balance at the start of the month.\n");
+        printf("\nNow your saving categories (e.g. an emergency fund), with their balance at the start of the month.\n\n");
     }
     else
     {
-        printf("\nNow your investment categories (e.g. an index fund), with their total value at the start of the month.\n");
+        printf("\nNow your investment categories (e.g. an index fund), with their total value at the start of the month.\n\n");
     }
 
     while (1)
@@ -927,6 +1075,7 @@ static int wizard_categories(Book *book, CategoryKind kind)
         {
             return status;
         }
+        printf("\n");
     }
 }
 

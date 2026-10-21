@@ -11,3 +11,6 @@ data/*
 !data/.gitkeep
 reports/*
 !reports/.gitkeep
+
+# Local working notes (specification, decisions), not published
+docs/
