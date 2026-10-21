@@ -1,5 +1,13 @@
 # VS Code settings
 .vscode/
 
-# Build binary
-program
+# Build binary and build artifacts
+/bookkeeping
+build/
+*.o
+
+# Personal financial data: the folders are kept (by their .gitkeep), never their contents
+data/*
+!data/.gitkeep
+reports/*
+!reports/.gitkeep
