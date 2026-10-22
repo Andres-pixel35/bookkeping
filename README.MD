@@ -116,7 +116,7 @@ Actions of `-c` / `--categories` / `categories`:
 |---|---|---|---|
 | `-a` | `--add` | `add` | `<saving\|investment> <name> [<opening amount>]` new category. |
 | `-n` | `--rename` | `rename` | `<old> <new>` renames it everywhere in the open month. |
-| `-r` | `--delete` | `delete` | `<name>` only when it started the month at 0 and has no entries (asks y/n). |
+| `-r` | `--delete` | `delete` | `<name>` only when it started the month at 0 and has no entries; otherwise it is refused at once with every reason, and only an allowed delete asks y/n. |
 | `-o` | `--set-opening` | `set-opening` | `<name> <amount>` fixes the opening balance (or value) of a category. |
 
 **Help pages:** `-h` (or `--help`, `help`) shows everything; `-h flags` only the commands and flags; `-h features` only how things work (amounts, the open month, cash and net worth, investments with a worked example, files). On a terminal, section titles are bold and commands are green.
@@ -149,7 +149,7 @@ Examples:
 
 Names with spaces or commas go between quotes. The date defaults to today when today is inside the open month; otherwise you must give it (`-d` / `--date`). Any day of the open month is accepted; dates outside it are refused. Invalid arguments print a usage line and return a non-zero exit code.
 
-If today is already past the open month, the program shows a notice suggesting you close it.
+If today is already past the open month, the program shows a notice suggesting you close it: once when the menu starts, and with `-l` and `-s`. It is not repeated after every add, edit or delete, so catching up on a past month stays quiet.
 
 ---
 

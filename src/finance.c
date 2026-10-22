@@ -516,19 +516,13 @@ int rename_category(Book *book, size_t index, const char *new_name)
     return 0;
 }
 
-// a category can only go away when it holds nothing and nothing in the open month uses it, otherwise money would vanish from the books
+// a category can only go away when it holds nothing and nothing in the open month uses it, otherwise money would vanish
+// from the books. All the reasons are checked, so the message can list every one of them
 int check_category_delete(const Book *book, size_t index)
 {
     const Category *category = &book->categories[index];
+    char balance[SIZE_MONEY];
     size_t uses = 0;
-
-    if (category->opening != 0)
-    {
-        char balance[SIZE_MONEY];
-        format_money(category->opening, false, balance, sizeof(balance));
-        category_not_empty(category->name, balance);
-        return ERR_CATEGORY;
-    }
 
     for (size_t i = 0; i < book->entry_count; i++)
     {
@@ -538,13 +532,14 @@ int check_category_delete(const Book *book, size_t index)
         }
     }
 
-    if (uses > 0)
+    if (category->opening == 0 && uses == 0)
     {
-        category_in_use(category->name, uses);
-        return ERR_CATEGORY;
+        return 0;
     }
 
-    return 0;
+    format_money(category->opening, false, balance, sizeof(balance));
+    category_not_deletable(category->name, category->opening != 0 ? balance : NULL, uses);
+    return ERR_CATEGORY;
 }
 
 // the closing balances of this month are the opening balances of the next one, and the next month starts with no entries

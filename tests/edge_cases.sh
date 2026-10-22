@@ -72,6 +72,12 @@ refuse()
     [ "$(snapshot)" = "$before" ] || fail "bookkeeping $* was refused but changed the data files"
 }
 
+didnt_say()
+{
+    CHECKS=$((CHECKS + 1))
+    if grep -F -q -- "$1" "$LAST"; then fail "the output should not contain: $1"; fi
+}
+
 said()
 {
     CHECKS=$((CHECKS + 1))
@@ -97,6 +103,13 @@ refuse $ERR_DATE '' -a expense food 5 -d 2024-01-01                # the next ye
 refuse $ERR_USAGE '' -a expense food 5 -d 32
 run 0 '' -a saving "Rainy day" 100 -d 15
 run 0 '' -a invest-value Shares 1100 -d 31
+didnt_say "today is past the open month"                            # no notice after every add...
+run 0 '' -s
+said "today is past the open month (2023-12)"                       # ...only where the month is looked at
+run 0 '' -l
+said "today is past the open month"
+run 0 '8\n'
+[ "$(grep -c 'today is past the open month' "$LAST")" -eq 1 ] || fail "the menu should show the notice once"
 run 0 'y\n' -C
 said "The open month is now 2024-01."
 contains "$BOOKKEEPING_DIR/data/state.csv" "2024-01,240000"        # 1,000 + 2,000 - 500 - 100
@@ -193,7 +206,7 @@ refuse $ERR_USAGE '' -e 1.5
 refuse $ERR_USAGE '' -r 1 2
 refuse $ERR_ENTRY '' -e 99
 refuse $ERR_ENTRY '' --delete 99
-said "There is no entry with the ID 99"
+said "There is no entry with the ID 99 in the open month. Use \"bookkeeping -l\" to see the IDs."
 
 # add: missing, extra and invalid arguments
 refuse $ERR_USAGE '' -a
@@ -245,7 +258,22 @@ refuse $ERR_CATEGORY '' -c -n "Fund A" stocks
 refuse $ERR_USAGE '' -c -n "Fund A" ''
 refuse $ERR_CATEGORY 'y\n' -c -r Nope
 refuse $ERR_CATEGORY 'y\n' -c -r "Fund A"                           # it has money and entries
+didnt_say "Delete the category"                                     # refused before asking, not after a "y"
+said "  - it started the month with \$100.00"                       # every reason is listed
+said "  - 1 entry of the open month uses it"
+said "Withdraw its money, close the month"
 refuse $ERR_CATEGORY 'y\n' -c -r Stocks                             # it has money
+said "  - it started the month with \$50.00"
+didnt_say "of the open month use"
+run 0 '' -c -a saving Temp
+run 0 '' -a saving Temp 5 -d 3
+run 0 '' -a saving Temp 5 -d 4
+refuse $ERR_CATEGORY 'y\n' -c -r Temp                               # it started at 0 but has entries
+said "  - 2 entries of the open month use it"
+said "Delete those entries"
+didnt_say "it started the month with"
+refuse 0 '5\n3\nTemp\n6\n8\n'                                    # the same from the menu: Categories > Delete, back, quit
+didnt_say "Delete the category \"Temp\"?"
 refuse $ERR_CATEGORY '' -c -o Nope 5
 refuse $ERR_USAGE '' -c -o "Fund A" abc
 refuse $ERR_USAGE '' -c -o "Fund A" -5
@@ -266,8 +294,9 @@ refuse $ERR_EOF '' -r 2                                             # the input 
 refuse $ERR_EOF 'income\n' -e 1                                     # the input ends in the middle of an edit
 refuse $ERR_EOF '1\n2\nfood\n'                                      # ... and in the middle of a new entry
 said "The input ended"
-refuse $ERR_EOF '' -c -r "Fund A"
 run 0 '' -c -a saving Empty
+refuse $ERR_EOF '' -c -r Empty                                      # the input ends at the confirmation
+said "Delete the category \"Empty\"?"
 run 0 'y\n' -c -r Empty                                             # 0 and no entries: allowed
 
 # ================================================================ 5. the data directory and its files

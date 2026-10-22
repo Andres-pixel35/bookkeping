@@ -828,8 +828,13 @@ static int menu_category_change(Book *book, int option)
             break;
 
         case 3:
-            snprintf(prompt, sizeof(prompt), "Delete the category \"%s\"?", book->categories[index].name);
-            status = ask_choose(prompt, 'n', &yes);
+            // the rules are checked before asking, so nobody confirms a delete that is then refused
+            status = check_category_delete(book, index);
+            if (status == 0)
+            {
+                snprintf(prompt, sizeof(prompt), "Delete the category \"%s\"?", book->categories[index].name);
+                status = ask_choose(prompt, 'n', &yes);
+            }
             if (status == 0 && yes)
             {
                 status = ledger_delete_category(book, index);
@@ -1366,6 +1371,10 @@ static int command_categories(Book *book, int argc, char **argv)
         status = lookup_category(book, argv[1], &index);
         if (status == 0)
         {
+            status = check_category_delete(book, index);
+        }
+        if (status == 0)
+        {
             snprintf(prompt, sizeof(prompt), "Delete the category \"%s\"?", book->categories[index].name);
             status = ask_choose(prompt, 'n', &yes);
         }
@@ -1437,10 +1446,12 @@ static int dispatch(Book *book, int argc, char **argv)
     }
     if (matches(command, "list|--list|-l") && argc == 2)
     {
+        print_notice(book);
         return print_entries(book);
     }
     if (matches(command, "summary|--summary|-s") && argc == 2)
     {
+        print_notice(book);
         return show_summary(book);
     }
     if (matches(command, "close|--close|-C") && argc == 2)
@@ -1503,8 +1514,17 @@ int run_cli(int argc, char **argv)
     }
     if (status == 0)
     {
-        print_notice(&book);
-        status = argc == 1 ? run_menu(&book) : dispatch(&book, argc, argv);
+        // the notice to close a finished month is shown when the menu starts and with -l / -s, the commands where the
+        // user looks at the month; repeating it after every add would only be noise while catching up on a past month
+        if (argc == 1)
+        {
+            print_notice(&book);
+            status = run_menu(&book);
+        }
+        else
+        {
+            status = dispatch(&book, argc, argv);
+        }
     }
 
     if (status == ERR_EOF)
