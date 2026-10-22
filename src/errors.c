@@ -173,18 +173,20 @@ void invalid_type(const char *input)
     red(0);
 }
 
-void insufficient_balance(const char *category, const char *wanted, const char *available)
+// the withdrawal named is the one that would go over its balance: the one being added, or a later one that a change
+// (a new withdrawal before it, a deleted deposit...) would leave without enough money
+void insufficient_balance(const char *category, const char *wanted, const char *date, const char *available)
 {
     red(1);
-    fprintf(stderr, "ERROR: You haven't that amount of money in \"%s\", you tried to withdraw \"%s\", but at that point you only have: \"%s\".\n"
-                    "Please try again.\n", category, wanted, available);
+    fprintf(stderr, "ERROR: You haven't that amount of money in \"%s\": the withdrawal of \"%s\" on %s needs it,\n"
+                    "but at that point there would only be: \"%s\". Please try again.\n", category, wanted, date, available);
     red(0);
 }
 
 void unknown_category(const char *name, const char *kind)
 {
     red(1);
-    fprintf(stderr, "ERROR: There is no %s category called \"%s\". Use \"bookkeeping categories\" to see them, or add it first.\n", kind, name);
+    fprintf(stderr, "ERROR: There is no %s category called \"%s\". Use \"bookkeeping -c\" to see them, or add it first.\n", kind, name);
     red(0);
 }
 
@@ -195,19 +197,28 @@ void category_exists(const char *name)
     red(0);
 }
 
-void category_not_empty(const char *name, const char *balance)
+// every reason is listed at once, so the user knows everything that stands in the way. balance is NULL when the
+// category started the month at 0
+void category_not_deletable(const char *name, const char *balance, size_t entries)
 {
     red(1);
-    fprintf(stderr, "ERROR: The category \"%s\" can't be deleted because it started the month with %s.\n"
-                    "Withdraw that money, close the month, and delete it when it starts the next month at 0 with no entries.\n", name, balance);
-    red(0);
-}
-
-void category_in_use(const char *name, size_t entries)
-{
-    red(1);
-    fprintf(stderr, "ERROR: The category \"%s\" can't be deleted because %zu entries of the open month use it.\n"
-                    "Delete or edit those entries first.\n", name, entries);
+    fprintf(stderr, "ERROR: The category \"%s\" can't be deleted yet:\n", name);
+    if (balance != NULL)
+    {
+        fprintf(stderr, "  - it started the month with %s (only a category that starts a month at 0 can go away)\n", balance);
+    }
+    if (entries > 0)
+    {
+        fprintf(stderr, "  - %zu %s of the open month use%s it\n", entries, entries == 1 ? "entry" : "entries", entries == 1 ? "s" : "");
+    }
+    if (balance != NULL)
+    {
+        fprintf(stderr, "Withdraw its money, close the month, and delete it when it starts the next month at 0 with no entries.\n");
+    }
+    else
+    {
+        fprintf(stderr, "Delete those entries (or move them to another category with -e) first.\n");
+    }
     red(0);
 }
 
@@ -222,6 +233,6 @@ void report_exists(const char *file_name)
 void entry_not_found(int id)
 {
     red(1);
-    fprintf(stderr, "ERROR: There is no entry with the ID %d in the open month. Use \"bookkeeping list\" to see the IDs.\n", id);
+    fprintf(stderr, "ERROR: There is no entry with the ID %d in the open month. Use \"bookkeeping -l\" to see the IDs.\n", id);
     red(0);
 }

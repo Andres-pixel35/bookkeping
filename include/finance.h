@@ -22,7 +22,7 @@ int sort_entries(const Book *book, const Entry ***sorted);
 int compute_summary(const Book *book, MonthSummary *summary);
 void free_summary(MonthSummary *summary);
 int check_balances(const Book *book);
-double return_percentage(const CategoryTotals *totals);
+bool return_percentage(const CategoryTotals *totals, double *percentage);
 int aggregate_items(const Book *book, EntryType type, Items **items, size_t *count);
 int rename_category(Book *book, size_t index, const char *new_name);
 int check_category_delete(const Book *book, size_t index);

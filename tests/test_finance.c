@@ -2,6 +2,19 @@
 #include "../include/errors.h"
 #include "../include/helpers.h"
 
+static bool near(double a, double b)
+{
+    return a - b < 0.0001 && b - a < 0.0001;
+}
+
+// the return % of an investment, which must exist
+static double percent(const CategoryTotals *totals)
+{
+    double result = 0;
+    assert(return_percentage(totals, &result));
+    return result;
+}
+
 // the month of the e2e scenario, checked number by number against the formulas of the README
 static void test_month_math(void)
 {
@@ -40,11 +53,12 @@ static void test_month_math(void)
     assert(s.categories[0].closing == 80000 && s.categories[1].closing == 5000);
     assert(s.savings_opening == 70000 && s.savings_closing == 85000);
 
-    // gain = closing - opening - contributions + withdrawals, return % = gain / (opening + contributions)
+    // gain = closing - opening - contributions + withdrawals, return % = gain / capital at work (Modified Dietz)
     assert(s.categories[2].closing == 126000 && s.categories[2].gain == 6000);
-    assert(return_percentage(&s.categories[2]) > 4.999 && return_percentage(&s.categories[2]) < 5.001);
+    // the 200 put in on day 3 was at work 3 of the 5 days until the value update: 1,000 + 200 x 3/5 = 1,120
+    assert(near(s.categories[2].capital, 112000) && near(percent(&s.categories[2]), 6000.0 / 112000 * 100));
     assert(s.categories[3].closing == 35000 && s.categories[3].gain == -10000);
-    assert(return_percentage(&s.categories[3]) < -19.999 && return_percentage(&s.categories[3]) > -20.001);
+    assert(near(percent(&s.categories[3]), -20)); // the withdrawal comes after the value update: not in the period
     assert(s.categories[4].closing == 38000 && s.categories[4].gain == 0); // opening + contributions - withdrawals
     assert(s.invest_gain == -4000);
 
@@ -61,7 +75,7 @@ static void test_value_update_then_contribution(void)
 {
     Book book = new_book("", 0);
     MonthSummary s;
-    CategoryTotals empty = { 0, 0, 0, 0, 0 };
+    CategoryTotals empty = { .capital = 0 };
 
     add_category(&book, KIND_INVESTMENT, "Stocks", 100000);
     push(&book, make_entry(ENTRY_INVEST_VALUE, "Stocks", 90000, 10));
@@ -70,7 +84,62 @@ static void test_value_update_then_contribution(void)
     assert(compute_summary(&book, &s) == 0);
     assert(s.categories[0].closing == 95000);
     assert(s.categories[0].gain == -10000);
-    assert(return_percentage(&empty) == 0); // nothing invested: 0%, never a division by zero
+    assert(near(percent(&s.categories[0]), -10)); // the contribution after the update earns nothing and is not counted
+    double unused = 0;
+    assert(!return_percentage(&empty, &unused)); // nothing at work: no percentage, never a division by zero
+    free_summary(&s);
+    free_book(&book);
+}
+
+/**
+ * The return % weights each contribution by the days it was at work (Modified Dietz): 100 at the start of the month,
+ * 200 put in, a value update of 360 on day 20. The gain is always +60, the return depends on when the 200 came in.
+ */
+static double fund_return(int contribution_day)
+{
+    Book book = new_book("", 0);
+    MonthSummary s;
+    double result = 0;
+
+    add_category(&book, KIND_INVESTMENT, "Fund", 10000);
+    push(&book, make_entry(ENTRY_INVEST, "Fund", 20000, contribution_day));
+    push(&book, make_entry(ENTRY_INVEST_VALUE, "Fund", 36000, 20));
+    assert(compute_summary(&book, &s) == 0);
+    assert(s.categories[0].gain == 6000);
+    assert(return_percentage(&s.categories[0], &result));
+    free_summary(&s);
+    free_book(&book);
+    return result;
+}
+
+static void test_weighted_return(void)
+{
+    assert(near(fund_return(1), 20));         // 60 / (100 + 200 x 20/20)
+    assert(near(fund_return(5), 6000.0 / 260)); // 60 / (100 + 200 x 16/20) = 23.08%
+    assert(near(fund_return(19), 50));        // 60 / (100 + 200 x 2/20)
+
+    // several value updates in a month: only the latest one sets the value, the gain and the end of the period
+    Book book = new_book("", 0);
+    MonthSummary s;
+    add_category(&book, KIND_INVESTMENT, "Fund", 10000);
+    push(&book, make_entry(ENTRY_INVEST, "Fund", 20000, 1));
+    push(&book, make_entry(ENTRY_INVEST_VALUE, "Fund", 25000, 10)); // a loss on day 10...
+    push(&book, make_entry(ENTRY_INVEST_VALUE, "Fund", 36000, 20)); // ...recovered by day 20
+    push(&book, make_entry(ENTRY_INVEST_VALUE, "Fund", 99999, 15)); // dated before the day-20 one: it doesn't replace it
+    assert(compute_summary(&book, &s) == 0);
+    assert(s.categories[0].closing == 36000 && s.categories[0].gain == 6000 && s.categories[0].valued_day == 20);
+    assert(near(percent(&s.categories[0]), 20));
+    free_summary(&s);
+    free_book(&book);
+
+    // a withdrawal that takes almost everything out leaves no money at work: the percentage is n/a, not a huge number
+    book = new_book("", 0);
+    double unused = 0;
+    add_category(&book, KIND_INVESTMENT, "Fund", 10000);
+    push(&book, make_entry(ENTRY_INVEST_WITHDRAW, "Fund", 10000, 1));
+    push(&book, make_entry(ENTRY_INVEST_VALUE, "Fund", 0, 2));
+    assert(compute_summary(&book, &s) == 0);
+    assert(s.categories[0].gain == 0 && !return_percentage(&s.categories[0], &unused));
     free_summary(&s);
     free_book(&book);
 }
@@ -186,6 +255,7 @@ int main(void)
 {
     test_month_math();
     test_value_update_then_contribution();
+    test_weighted_return();
     test_top_aggregation();
     test_withdrawals();
     test_category_rules();

@@ -61,8 +61,8 @@ It compiles without warnings with `-std=c11 -Wall -Wextra -Wpedantic`.
 The first time (when there is no `data/state.csv`) the program asks:
 
 1. **The first month to track** (`YYYY-MM`, default: the current month).
-2. **The opening cash**: the money you have at the start of that month besides savings and investments. It can be negative (the wizard asks whether it's a positive amount).
-3. **Your saving categories** with their balance at the start of the month, and then **your investment categories** with their total value at the start of the month. Add as many as you want (or none); write `done` (or just press Enter) to finish each list.
+2. **Whether you have any opening cash** (the money you have at the start of that month besides savings and investments, e.g. your bank account and wallet). If yes, whether it's a positive amount (it can be negative if you start the month owing money) and how much.
+3. **Your saving categories** with their balance at the start of the month, and then **your investment categories** with what each one is worth at the start of the month (its total value, as your bank or broker shows it). Add as many as you want (or none); write `done` (or just press Enter) to finish each list.
 
 Nothing is written until the last answer, so an interrupted wizard leaves no half setup behind.
 
@@ -93,23 +93,33 @@ Each action returns to the menu, and every screen starts with its own title so t
 
 **Adding entries:** choose *Add entries*, then the type (income, expense, saving deposit…). You can then record as many entries of that type as you want, one after the other; each one is saved as soon as it is complete. Press Enter (or write `done`) at the item name or category prompt when you are finished: you go back to the list of types, where you can pick another type or *Back to the main menu*. The first date defaults to today and every next one to the date of the previous entry, so a batch of receipts from the same day only needs the date once. Prompts show the expected format, and the default between brackets: Enter accepts it. When an answer is wrong the prompt says why and asks again. Ctrl-D (end of input) at the menu quits; in the middle of an action it stops that action (nothing of it is saved, everything before it is safe).
 
-### Quick commands
+### Quick commands and flags
 
-| Command | What it does |
-|---|---|
-| `bookkeeping add <type> <item\|category> <amount> [--date YYYY-MM-DD]` | Records an entry (see the types below). |
-| `bookkeeping list` | Every entry of the open month, day by day, with its ID. |
-| `bookkeeping summary` | Totals of the open month so far, with every category. |
-| `bookkeeping edit <id>` | Changes any field of an entry (Enter keeps the current value). |
-| `bookkeeping delete <id>` | Deletes an entry (asks y/n). |
-| `bookkeeping categories` | Your categories with their opening balance and their balance now. |
-| `bookkeeping categories add <saving\|investment> <name> [<opening amount>]` | New category. |
-| `bookkeeping categories rename <old> <new>` | Renames it everywhere in the open month. |
-| `bookkeeping categories delete <name>` | Only when it started the month at 0 and has no entries (asks y/n). |
-| `bookkeeping categories set-opening <name> <amount>` | Fixes the opening balance (or value) of a category. |
-| `bookkeeping opening-cash [-]<amount>` | Fixes the opening cash of the open month. |
-| `bookkeeping close` | Preview, y/n confirmation, both reports, next month. |
-| `bookkeeping help` | The help text. |
+Every command has the usual Linux short and long forms: one dash with a letter (`-a`) or two dashes with the name (`--add`). Nothing else is accepted: a plain word (`add`), a name with one dash (`-add`) or a letter with two (`--a`) is refused with the usage line (exit code 198).
+
+| Short | Long | What it does |
+|---|---|---|
+| `-a` | `--add` | `<type> <item\|category> <amount> [-d <date>]` records an entry (types below). |
+| `-l` | `--list` | Every entry of the open month, day by day, with its ID. |
+| `-s` | `--summary` | Totals of the open month so far, with every category. |
+| `-e` | `--edit` | `<id>` changes any field of an entry (Enter keeps the current value). |
+| `-r` | `--delete` | `<id>` deletes (removes) an entry, after a y/n confirmation. |
+| `-c` | `--categories` | Your categories with their opening balance and their balance now, or one of the actions below. |
+| `-o` | `--opening-cash` | `[-]<amount>` fixes the opening cash of the open month. |
+| `-C` | `--close` | Preview, y/n confirmation, both reports, next month. |
+| `-h` | `--help` | `[flags\|features]` the help (see below). |
+| `-d` | `--date` | `YYYY-MM-DD` or the day of the month, for `-a`; `--date=14` works too. |
+
+Actions of `-c` / `--categories`:
+
+| Short | Long | What it does |
+|---|---|---|
+| `-a` | `--add` | `<saving\|investment> <name> [<opening amount>]` new category. |
+| `-n` | `--rename` | `<old> <new>` renames it everywhere in the open month. |
+| `-r` | `--delete` | `<name>` only when it started the month at 0 and has no entries; otherwise it is refused at once with every reason, and only an allowed delete asks y/n. |
+| `-o` | `--set-opening` | `<name> <amount>` fixes the opening balance (or value) of a category. |
+
+**Help pages:** `-h` (or `--help`) shows everything; `-h flags` only the commands and flags; `-h features` only how things work (amounts, the open month, cash and net worth, investments with a worked example, files). On a terminal, section titles are bold and commands are green.
 
 Entry types:
 
@@ -125,31 +135,33 @@ Entry types:
 Examples:
 
 ```sh
-./bookkeeping add expense food 25000
-./bookkeeping add expense "food, snacks" 12.50 --date 2026-10-14
-./bookkeeping add income salary 3000 --date 1        # day 1 of the open month
-./bookkeeping add saving "Emergency fund" 300
-./bookkeeping add invest "Index fund" 200
-./bookkeeping add invest-value "Index fund" 1260
-./bookkeeping list
-./bookkeeping edit 5
+./bookkeeping -a expense food 25000
+./bookkeeping --add expense "food, snacks" 12.50 --date 2026-10-14
+./bookkeeping --add income salary 3000 -d 1           # day 1 of the open month
+./bookkeeping -a saving "Emergency fund" 300
+./bookkeeping -a invest "Index fund" 200
+./bookkeeping -a invest-value "Index fund" 1260
+./bookkeeping -c -a investment "Gold" 500             # new investment category worth $500.00
+./bookkeeping -l
+./bookkeeping -e 5
+./bookkeeping -h features
 ```
 
-Names with spaces or commas go between quotes. The date defaults to today when today is inside the open month; otherwise you must give it (`--date`). Any day of the open month is accepted; dates outside it are refused. Invalid arguments print a usage line and return a non-zero exit code.
+Names with spaces or commas go between quotes. The date defaults to today when today is inside the open month; otherwise you must give it (`-d` / `--date`). Any day of the open month is accepted; dates outside it are refused. Invalid arguments print a usage line and return a non-zero exit code.
 
-If today is already past the open month, the program shows a notice suggesting you close it.
+If today is already past the open month, the program shows a notice suggesting you close it: once when the menu starts, and with `-l` and `-s`. It is not repeated after every add, edit or delete, so catching up on a past month stays quiet.
 
 ---
 
 ## Fixing mistakes before closing
 
-Everything in the open month can still change: list the entries (`list` or menu option 2) to see their IDs, then `edit <id>` (any field: type, item or category, amount, date) or `delete <id>`. Categories can be renamed (the entries follow the new name) and their opening balances fixed. A change is refused if it would make a withdrawal take more than its category had at that point of the month.
+Everything in the open month can still change: list the entries (`-l` or menu option 2) to see their IDs, then `-e <id>` (any field: type, item or category, amount, date) or `-r <id>`. Categories can be renamed (the entries follow the new name) and their opening balances fixed. A change is refused if it would make a withdrawal take more than its category had at that point of the month.
 
 ---
 
 ## Closing a month
 
-`bookkeeping close` (or menu option 6) shows the preview summary and asks for confirmation. Then it:
+`bookkeeping -C` (or `--close`, or menu option 6) shows the preview summary and asks for confirmation. Then it:
 
 1. writes `reports/MM_YYYY_Personal_Report.md` and `reports/MM_YYYY.md`,
 2. carries the closing cash and the closing balance/value of every category forward,
@@ -159,13 +171,21 @@ A month can be closed before it ends (the preview warns you), but not before it 
 
 ---
 
-## Investments: value updates
+## Investments: how gains and losses are recorded
 
-Contributions and withdrawals only say how much money you moved. To know the gain or loss the program needs what the investment is **worth**, so from time to time record a **value update**:
+The program can't know what the market did, so you tell it what each investment is **worth**, and it works out the gain or loss from that. There are three kinds of investment entries:
+
+| Entry | Command | Meaning |
+|---|---|---|
+| Contribution | `-a invest <category> <amount>` | Money you put in from your cash. It is **not** a gain. |
+| Withdrawal | `-a invest-withdraw <category> <amount>` | Money you take out to your cash. It is **not** a loss. |
+| Value update | `-a invest-value <category> <amount>` | What the investment is worth today. |
+
+For a value update, enter the **total current value, including returns, interest and price changes** — what your bank or broker shows, not just the money you put in:
 
 > Enter what this investment is worth today (what you put in + what it has earned or lost).
 
-This is the **total current value, including returns, interest and price changes** — not just the money you put in.
+Record a value update whenever you check your statement, and at least once before closing the month. You can record as many as you want: each one stays in the ledger, but only the **latest one of the month** (by date, then by the order you recorded them) sets the value, the gain and the return %. Without any value update, the program assumes the value only changed by what you put in or took out, so the month's gain is 0. After every investment entry the program prints the value of that investment and its gain so far, so you see the effect immediately.
 
 Per investment category and month:
 
@@ -173,10 +193,40 @@ Per investment category and month:
 closing_value = the latest value update of the month, moved by the contributions and withdrawals dated after it
                 (with no value update: opening_value + contributions - withdrawals, so the gain is 0)
 gain          = closing_value - opening_value - contributions + withdrawals
-return %      = gain / (opening_value + contributions) x 100      (0 when that is 0)
+return %      = gain / money_at_work x 100                        (n/a when no money was at work)
+money_at_work = opening_value + sum of each contribution (minus each withdrawal) made before the latest value update,
+                weighted by the share of days it was invested until that update:
+                amount x (update_day - its_day + 1) / update_day
 ```
 
-Example: an index fund worth $1,000.00 at the start of the month, $200.00 contributed, and a value update of $1,260.00 → gain +$60.00, return +5.00%.
+The return % weights money by how long it was invested (the *Modified Dietz* method), so the same gain is a better result when the money arrived late. For example, starting with 100, adding 200 and recording a value of 360 on day 20 is always a gain of **+60**, but:
+
+| The 200 came in on | Money at work | Return |
+|---|---|---|
+| day 1 | 100 + 200 × 20/20 = 300 | +20.00% |
+| day 5 | 100 + 200 × 16/20 = 260 | +23.08% |
+| day 19 | 100 + 200 × 2/20 = 120 | +50.00% |
+
+**Worked example.** "Index fund" is worth $1,000.00 at the start of the month.
+
+| Day | Command | Value | Gain so far |
+|---|---|---|---|
+| 3 | `-a invest "Index fund" 200 -d 3` (you put in $200.00) | $1,200.00 | $0.00 |
+| 20 | `-a invest-value "Index fund" 1260 -d 20` (your broker shows $1,260.00) | $1,260.00 | 1,260 − 1,000 − 200 + 0 = **+$60.00**; money at work 1,000 + 200 × 18/20 = 1,180, return 60 / 1,180 = **+5.08%** |
+| 25 | `-a invest-withdraw "Index fund" 100 -d 25` (you take out $100.00) | $1,160.00 | still **+$60.00 (+5.08%)**: taking money out is not a loss |
+
+Had the broker shown $1,150.00 on day 20, the month would end in a loss: 1,150 − 1,000 − 200 = **−$50.00 (−4.24%)**.
+
+### Limitations of the return %
+
+The gain/loss is exact. The return % is an approximation:
+
+- **It assumes the gain built up evenly over the days.** If the price jumped right before or after a big contribution or withdrawal, the real return differs. An exact (time-weighted) return would need the value of the investment right before every contribution and withdrawal, which the program doesn't compute.
+- **It only covers the month up to the latest value update.** After it the value is assumed unchanged, and contributions or withdrawals dated after it don't count in the percentage (they still change the value one to one).
+- **Earlier value updates of the month don't change the gain or the percentage**; only the latest one does.
+- **Dates are whole days:** money moved on a day counts as invested for that whole day.
+- **Little or no money at work:** when almost everything was withdrawn the percentage would be meaningless, so it shows **n/a**; with very little money at work it can look extreme.
+- **One month only:** it is the return of the month, not a yearly rate. The total of all investments adds the money at work of each one, each measured up to its own latest value update.
 
 ---
 
