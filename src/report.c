@@ -58,6 +58,20 @@ static void md_text(FILE *file, const char *text)
     }
 }
 
+static void md_return(FILE *file, const CategoryTotals *totals)
+{
+    double percentage = 0;
+
+    if (return_percentage(totals, &percentage))
+    {
+        fprintf(file, " %+.2f%% |", percentage);
+    }
+    else
+    {
+        fputs(" n/a |", file);
+    }
+}
+
 static void md_money(FILE *file, long long cents, bool show_plus)
 {
     char money[SIZE_MONEY];
@@ -201,7 +215,7 @@ static void investments_table(FILE *file, const ReportContext *context, bool ful
             md_money(file, totals->withdrawals, false);
         }
         md_money(file, totals->gain, true);
-        fprintf(file, " %+.2f%% |", return_percentage(totals));
+        md_return(file, totals);
         if (full)
         {
             md_money(file, totals->closing, false);
@@ -216,8 +230,9 @@ static void investments_table(FILE *file, const ReportContext *context, bool ful
     }
 
     // the total return uses the same formula with the totals of every investment
-    CategoryTotals total = { summary->invest_opening, summary->invest_contributions, summary->invest_withdrawals,
-                             summary->invest_closing, summary->invest_gain };
+    CategoryTotals total = { .opening = summary->invest_opening, .deposits = summary->invest_contributions,
+                             .withdrawals = summary->invest_withdrawals, .closing = summary->invest_closing,
+                             .gain = summary->invest_gain, .capital = summary->invest_capital };
 
     fputs("| **Total** |", file);
     if (full)
@@ -227,7 +242,7 @@ static void investments_table(FILE *file, const ReportContext *context, bool ful
         md_money(file, total.withdrawals, false);
     }
     md_money(file, total.gain, true);
-    fprintf(file, " %+.2f%% |", return_percentage(&total));
+    md_return(file, &total);
     if (full)
     {
         md_money(file, total.closing, false);
@@ -320,7 +335,9 @@ static int write_personal_report(FILE *file, const void *data)
     fputs("## Investments\n\n", file);
     fputs("Closing value = the latest value update of the month, moved by the contributions and withdrawals after it.\n"
           "Gain/loss = closing value - opening value - contributions + withdrawals.\n"
-          "Return % = gain/loss / (opening value + contributions).\n\n", file);
+          "Return % = gain/loss / average money at work: each contribution and withdrawal is weighted by the days it was\n"
+          "invested, from the start of the month to the latest value update (Modified Dietz). It is an approximation: it\n"
+          "assumes the gain built up evenly over those days, and it shows n/a when no money was at work.\n\n", file);
     investments_table(file, context, true);
 
     fputs("## Ledger\n\n", file);

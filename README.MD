@@ -185,7 +185,7 @@ For a value update, enter the **total current value, including returns, interest
 
 > Enter what this investment is worth today (what you put in + what it has earned or lost).
 
-Record a value update whenever you check your statement, and at least once before closing the month; only the latest one of the month counts. Without any, the program assumes the value only changed by what you put in or took out, so the month's gain is 0. After every investment entry the program prints the value of that investment and its gain so far, so you see the effect immediately.
+Record a value update whenever you check your statement, and at least once before closing the month. You can record as many as you want: each one stays in the ledger, but only the **latest one of the month** (by date, then by the order you recorded them) sets the value, the gain and the return %. Without any value update, the program assumes the value only changed by what you put in or took out, so the month's gain is 0. After every investment entry the program prints the value of that investment and its gain so far, so you see the effect immediately.
 
 Per investment category and month:
 
@@ -193,18 +193,40 @@ Per investment category and month:
 closing_value = the latest value update of the month, moved by the contributions and withdrawals dated after it
                 (with no value update: opening_value + contributions - withdrawals, so the gain is 0)
 gain          = closing_value - opening_value - contributions + withdrawals
-return %      = gain / (opening_value + contributions) x 100      (0 when that is 0)
+return %      = gain / money_at_work x 100                        (n/a when no money was at work)
+money_at_work = opening_value + sum of each contribution (minus each withdrawal) made before the latest value update,
+                weighted by the share of days it was invested until that update:
+                amount x (update_day - its_day + 1) / update_day
 ```
+
+The return % weights money by how long it was invested (the *Modified Dietz* method), so the same gain is a better result when the money arrived late. For example, starting with 100, adding 200 and recording a value of 360 on day 20 is always a gain of **+60**, but:
+
+| The 200 came in on | Money at work | Return |
+|---|---|---|
+| day 1 | 100 + 200 × 20/20 = 300 | +20.00% |
+| day 5 | 100 + 200 × 16/20 = 260 | +23.08% |
+| day 19 | 100 + 200 × 2/20 = 120 | +50.00% |
 
 **Worked example.** "Index fund" is worth $1,000.00 at the start of the month.
 
 | Day | Command | Value | Gain so far |
 |---|---|---|---|
 | 3 | `-a invest "Index fund" 200 -d 3` (you put in $200.00) | $1,200.00 | $0.00 |
-| 20 | `-a invest-value "Index fund" 1260 -d 20` (your broker shows $1,260.00) | $1,260.00 | 1,260 − 1,000 − 200 + 0 = **+$60.00**, return 60 / 1,200 = **+5.00%** |
-| 25 | `-a invest-withdraw "Index fund" 100 -d 25` (you take out $100.00) | $1,160.00 | still **+$60.00** (taking money out is not a loss) |
+| 20 | `-a invest-value "Index fund" 1260 -d 20` (your broker shows $1,260.00) | $1,260.00 | 1,260 − 1,000 − 200 + 0 = **+$60.00**; money at work 1,000 + 200 × 18/20 = 1,180, return 60 / 1,180 = **+5.08%** |
+| 25 | `-a invest-withdraw "Index fund" 100 -d 25` (you take out $100.00) | $1,160.00 | still **+$60.00 (+5.08%)**: taking money out is not a loss |
 
-Had the broker shown $1,150.00 on day 20, the month would end in a loss: 1,150 − 1,000 − 200 = **−$50.00 (−4.17%)**.
+Had the broker shown $1,150.00 on day 20, the month would end in a loss: 1,150 − 1,000 − 200 = **−$50.00 (−4.24%)**.
+
+### Limitations of the return %
+
+The gain/loss is exact. The return % is an approximation:
+
+- **It assumes the gain built up evenly over the days.** If the price jumped right before or after a big contribution or withdrawal, the real return differs. An exact (time-weighted) return would need the value of the investment right before every contribution and withdrawal, which the program doesn't compute.
+- **It only covers the month up to the latest value update.** After it the value is assumed unchanged, and contributions or withdrawals dated after it don't count in the percentage (they still change the value one to one).
+- **Earlier value updates of the month don't change the gain or the percentage**; only the latest one does.
+- **Dates are whole days:** money moved on a day counts as invested for that whole day.
+- **Little or no money at work:** when almost everything was withdrawn the percentage would be meaningless, so it shows **n/a**; with very little money at work it can look extreme.
+- **One month only:** it is the return of the month, not a yearly rate. The total of all investments adds the money at work of each one, each measured up to its own latest value update.
 
 ---
 

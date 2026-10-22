@@ -209,6 +209,17 @@ int sort_entries(const Book *book, const Entry ***sorted)
 }
 
 /**
+ * The average money at work in an investment from the start of the month to the end of `day` (Modified Dietz):
+ * the opening value plus every contribution (minus every withdrawal) weighted by the share of those days it was in.
+ * Money moved on day d counts as invested from the start of that day, so money added on day 1 counts for the whole period.
+ * sum of flow x (day - d + 1) / day  =  ((day + 1) x sum of flows - sum of flow x d) / day
+ */
+static double capital_at_work(const CategoryTotals *totals, int day)
+{
+    return (double)totals->opening + (double)((day + 1) * totals->flows - totals->flow_days) / day;
+}
+
+/**
  * Computes every total of the open month in one chronological pass over the entries.
  * Each saving and investment category is followed day by day, so a withdrawal is checked against what the
  * category had at that point in time (a value update sets the value of an investment, later contributions and
@@ -276,6 +287,8 @@ int compute_summary(const Book *book, MonthSummary *summary)
             case ENTRY_INVEST:
                 totals->deposits += entry->amount;
                 totals->closing += entry->amount;
+                totals->flows += entry->amount;
+                totals->flow_days += entry->amount * entry->day;
                 break;
 
             case ENTRY_SAVING_WITHDRAW:
@@ -289,10 +302,16 @@ int compute_summary(const Book *book, MonthSummary *summary)
                 }
                 totals->withdrawals += entry->amount;
                 totals->closing -= entry->amount;
+                totals->flows -= entry->amount;
+                totals->flow_days -= entry->amount * entry->day;
                 break;
 
             case ENTRY_INVEST_VALUE:
+                // the latest value update is the end of the measured period: what comes after it moves the value
+                // one to one and earns nothing as far as the program knows
                 totals->closing = entry->amount;
+                totals->valued_day = entry->day;
+                totals->capital = capital_at_work(totals, entry->day);
                 break;
 
             case ENTRY_TYPE_COUNT:
@@ -315,6 +334,12 @@ int compute_summary(const Book *book, MonthSummary *summary)
         {
             // whatever the value moved that was not money put in or taken out is what the market gave or took
             totals->gain = totals->closing - totals->opening - totals->deposits + totals->withdrawals;
+            if (totals->valued_day == 0)
+            {
+                // no value update: the gain is 0, and the capital of the whole month still counts in the total return
+                totals->capital = capital_at_work(totals, days_in_month(book->year, book->month));
+            }
+            summary->invest_capital += totals->capital;
             summary->invest_contributions += totals->deposits;
             summary->invest_withdrawals += totals->withdrawals;
             summary->invest_gain += totals->gain;
@@ -364,10 +389,17 @@ int check_balances(const Book *book)
     return status;
 }
 
-// gain / (opening value + contributions), 0 when nothing was invested
-double return_percentage(const CategoryTotals *totals)
+// gain / capital at work. It returns false when less than a cent was at work: then any percentage would be
+// meaningless (or absurdly big), and the reports show "n/a"
+bool return_percentage(const CategoryTotals *totals, double *percentage)
 {
-    return calculate_percentage(totals->opening + totals->deposits, totals->gain);
+    if (totals->capital < 1)
+    {
+        return false;
+    }
+
+    *percentage = (double)totals->gain / totals->capital * 100;
+    return true;
 }
 
 // biggest value first, and for the same value alphabetical order so the ranking never depends on luck

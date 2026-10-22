@@ -81,6 +81,12 @@ typedef struct CategoryTotals
     long long withdrawals;
     long long closing;      // balance or value at the end of the month (so far)
     long long gain;         // investments only
+    // investments only: the return % weights every contribution and withdrawal by the days it was invested
+    // (Modified Dietz), measured from the start of the month to the latest value update
+    long long flows;        // contributions - withdrawals so far in the chronological pass
+    long long flow_days;    // the same, each one multiplied by its day
+    int valued_day;         // day of the latest value update, 0 when there is none
+    double capital;         // average money at work in that period: the base of the return %
 }
 CategoryTotals;
 
@@ -99,6 +105,7 @@ typedef struct MonthSummary
     long long savings_closing;
     long long invest_opening;
     long long invest_closing;
+    double invest_capital;      // sum of the capital at work of every investment, the base of the total return %
     long long closing_cash;
     long long opening_net_worth;
     long long closing_net_worth;

@@ -175,7 +175,7 @@ BOOKKEEPING_DIR="$L" run 0 '' -a invest Gold 10 -d 04
 contains "$OUT" "Gold is now worth \$130.00, gain/loss so far this month: \$0.00 (+0.00%)"
 contains "$OUT" "No value update this month yet"
 BOOKKEEPING_DIR="$L" run 0 '' -a invest-value Gold 150 -d 05
-contains "$OUT" "Gold is now worth \$150.00, gain/loss so far this month: +\$20.00 (+15.38%)"
+contains "$OUT" "Gold is now worth \$150.00, gain/loss so far this month: +\$20.00 (+16.13%)"
 
 # 6e. the three help pages
 "$BIN" -h >"$DIR/help-all.txt" 2>&1 || fail "-h failed"
@@ -216,7 +216,7 @@ if [ -f "$PERSONAL" ] && [ -f "$KEY" ]; then
     contains "$PERSONAL" "| 3 | transport | \$65.00 | 5.49% |"
     contains "$PERSONAL" "| Emergency fund | \$500.00 | \$300.00 | \$0.00 | \$800.00 |"
     contains "$PERSONAL" "| Laptop fund | \$200.00 | \$0.00 | \$150.00 | \$50.00 |"
-    contains "$PERSONAL" "| Index fund | \$1,000.00 | \$200.00 | \$0.00 | +\$60.00 | +5.00% | \$1,260.00 |"
+    contains "$PERSONAL" "| Index fund | \$1,000.00 | \$200.00 | \$0.00 | +\$60.00 | +5.36% | \$1,260.00 |"
     contains "$PERSONAL" "| Crypto coins | \$500.00 | \$0.00 | \$50.00 | -\$100.00 | -20.00% | \$350.00 |"
     contains "$PERSONAL" "| 6 | $M-03 | Expense | snacks, drinks | \$20.00 |"
     contains "$PERSONAL" "| 3 | $M-04 | Expense | Food | \$79.50 |"
@@ -229,9 +229,9 @@ if [ -f "$PERSONAL" ] && [ -f "$KEY" ]; then
     lacks "$KEY" "snacks"
     contains "$KEY" "| Saved this month | \$300.00 | 8.82% |"
     contains "$KEY" "| Invested this month | \$200.00 | 5.88% |"
-    contains "$KEY" "| Index fund | +\$60.00 | +5.00% |"
+    contains "$KEY" "| Index fund | +\$60.00 | +5.36% |"
     contains "$KEY" "| Crypto coins | -\$100.00 | -20.00% |"
-    contains "$KEY" "| **Total** | -\$40.00 | -2.35% |"
+    contains "$KEY" "| **Total** | -\$40.00 | -2.47% |"
     contains "$KEY" "| Closing cash | \$2,765.00 |"
     contains "$KEY" "| **Net worth change** | +\$2,025.00 |"
 

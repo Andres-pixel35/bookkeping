@@ -86,6 +86,20 @@ static void print_notice(const Book *book)
     }
 }
 
+static void print_return(const CategoryTotals *totals)
+{
+    double percentage = 0;
+
+    if (return_percentage(totals, &percentage))
+    {
+        printf("%+.2f%%", percentage);
+    }
+    else
+    {
+        printf("return n/a");
+    }
+}
+
 static void print_line(const char *label, long long cents, bool show_plus)
 {
     printf("  %-34s ", label);
@@ -149,7 +163,9 @@ static void print_category_balances(const Book *book, const MonthSummary *summar
             {
                 printf("  (gain/loss ");
                 print_money(summary->categories[i].gain, true);
-                printf(", %+.2f%%)", return_percentage(&summary->categories[i]));
+                printf(", ");
+                print_return(&summary->categories[i]);
+                printf(")");
             }
             printf("\n");
         }
@@ -471,7 +487,9 @@ static int print_investment_result(const Book *book, const char *category)
         print_money(totals->closing, false);
         printf(", gain/loss so far this month: ");
         print_money(totals->gain, true);
-        printf(" (%+.2f%%)\n", return_percentage(totals));
+        printf(" (");
+        print_return(totals);
+        printf(")\n");
         if (!has_value_update(book, category))
         {
             printf("  No value update this month yet, so the value only moved by what you put in or took out (no gain).\n"
@@ -502,7 +520,9 @@ static void explain_investments(EntryType type)
 {
     printf("How investments work: you record the money you put in (contributions), the money you take out\n"
            "(withdrawals) and, from time to time, what the investment is WORTH (value updates). The program\n"
-           "works out the gain or loss: closing value - opening value - contributions + withdrawals.\n");
+           "works out the gain or loss: closing value - opening value - contributions + withdrawals.\n"
+           "The return %% weights every contribution and withdrawal by the days it was invested until the latest value\n"
+           "update. It is an approximation: see its limitations in \"bookkeeping -h features\".\n");
 
     if (type == ENTRY_INVEST)
     {
