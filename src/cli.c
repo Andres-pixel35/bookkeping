@@ -6,6 +6,7 @@
 #include "../include/cli.h"
 #include "../include/errors.h"
 #include "../include/finance.h"
+#include "../include/help.h"
 #include "../include/helpers.h"
 #include "../include/ledger.h"
 #include "../include/report.h"
@@ -17,57 +18,11 @@
 #define RULER "============================================================"
 
 static const char *USAGE =
-    "Usage: bookkeeping [help | list | summary | close | edit <id> | delete <id>\n"
-    "                   | add <type> <item|category> <amount> [--date YYYY-MM-DD]\n"
-    "                   | categories [add <saving|investment> <name> [<opening>] | rename <old> <new>\n"
-    "                                | delete <name> | set-opening <name> <amount>]\n"
-    "                   | opening-cash [-]<amount>]\n";
-
-// the help is split in lines because ISO C only promises string literals of 4095 characters
-static const char *HELP[] =
-{
-    "Bookkeeping: record your money day by day and close each month into two Markdown reports.\n\n",
-    "Run it without arguments for the interactive menu, or use a quick command.\n",
-    "In the menu, \"Add entries\" records as many entries of one type as you want, each one saved at once:\n",
-    "press enter (or write \"done\") at the item name or category prompt to go back to the list of types.\n\n",
-    "  bookkeeping add <type> <item|category> <amount> [--date YYYY-MM-DD]\n",
-    "      income | expense | debt <item>   free-form item name, e.g. add expense food 25000\n",
-    "      saving <category>                deposit into a saving category (cash -> saving)\n",
-    "      saving-withdraw <category>       money back from a saving category to your cash\n",
-    "      invest <category>                contribution into an investment (cash -> investment)\n",
-    "      invest-withdraw <category>       money back from an investment to your cash\n",
-    "      invest-value <category>          what the investment is worth today (see below)\n",
-    "      The date defaults to today, and can be any day of the open month (--date 2026-10-14 or --date 14).\n",
-    "  bookkeeping list                     every entry of the open month with its ID\n",
-    "  bookkeeping summary                  totals of the open month so far\n",
-    "  bookkeeping edit <id>                change any field of an entry (enter keeps the current value)\n",
-    "  bookkeeping delete <id>              delete an entry (asks for confirmation)\n",
-    "  bookkeeping categories               your saving and investment categories with their balances\n",
-    "  bookkeeping categories add <saving|investment> <name> [<opening amount>]\n",
-    "  bookkeeping categories rename <old name> <new name>\n",
-    "  bookkeeping categories delete <name>     only when it starts the month at 0 and has no entries\n",
-    "  bookkeeping categories set-opening <name> <amount>   fix the opening balance of a category\n",
-    "  bookkeeping opening-cash [-]<amount> fix the opening cash of the open month\n",
-    "  bookkeeping close                    preview, confirm, write both reports and open the next month\n",
-    "  bookkeeping help                     this text\n\n",
-    "Amounts: \"123\", \"123.4\" or \"123.45\" (at most two decimals, no sign, no thousands separators).\n",
-    "They are stored as integer cents, so no rounding ever changes a balance. Names with spaces go between quotes.\n\n",
-    "Investment value updates: enter what the investment is worth today, the TOTAL current value\n",
-    "(what you put in + what it has earned or lost: returns, interest and price changes), not only the money you put in.\n",
-    "  gain/loss = closing value - opening value - contributions + withdrawals\n",
-    "  return %  = gain/loss / (opening value + contributions) x 100\n",
-    "  closing value = the latest value update, moved by the contributions and withdrawals dated after it\n",
-    "                  (with no value update: opening value + contributions - withdrawals, so no gain)\n\n",
-    "Cash: closing cash = opening cash + incomes - expenses - debts - saving deposits + saving withdrawals\n",
-    "                     - investment contributions + investment withdrawals\n",
-    "A withdrawal moves money back to your cash; if you spent it, also record that expense.\n",
-    "A withdrawal can never take more than the category has at that point of the month.\n",
-    "Net worth = cash + savings + investment values. Percentages are relative to the incomes of the month.\n\n",
-    "Only one month is open: entries outside it are refused, and closed months are never edited again.\n",
-    "Fix mistakes before closing: list, edit, delete, rename categories or fix opening balances.\n\n",
-    "Files: data/state.csv, data/categories.csv, data/YYYY-MM.csv and reports/*.md inside the data directory,\n",
-    "which is the current directory unless BOOKKEEPING_DIR says otherwise. NO_COLOR turns the colors off.\n",
-};
+    "Usage: bookkeeping [-h [flags|features] | -l | -s | -C | -e <id> | -r <id>\n"
+    "                   | -a <type> <item|category> <amount> [-d YYYY-MM-DD]\n"
+    "                   | -c [-a <saving|investment> <name> [<opening>] | -n <old> <new> | -r <name> | -o <name> <amount>]\n"
+    "                   | -o [-]<amount>]\n"
+    "Every command also has a long and a word form (-a, --add, add). Run \"bookkeeping -h flags\" for the list.\n";
 
 static int usage(const char *why)
 {
@@ -82,12 +37,21 @@ static void print_title(const char *title)
     printf("\n%s--- %s ---%s\n\n", paint(COLOR_BOLD), title, paint(COLOR_RESET));
 }
 
-static void print_help(void)
+// arg is any of the names in names ("add|--add|-a"): every command has a word, a long and a short form
+static bool matches(const char *arg, const char *names)
 {
-    for (size_t i = 0; i < sizeof(HELP) / sizeof(HELP[0]); i++)
+    size_t len = strlen(arg);
+
+    while (*names != '\0')
     {
-        fputs(HELP[i], stdout);
+        size_t name_len = strcspn(names, "|");
+        if (name_len == len && strncmp(arg, names, len) == 0)
+        {
+            return true;
+        }
+        names += name_len + (names[name_len] == '|');
     }
+    return false;
 }
 
 // the memory, the files or the end of the input stop the menu, any other error was already explained and the menu goes on
@@ -117,7 +81,7 @@ static void print_notice(const Book *book)
     if (year > book->year || (year == book->year && month > book->month))
     {
         printf("%sNotice:%s today is past the open month (%04d-%02d). When everything is recorded,"
-               " close it with \"bookkeeping close\" (or option 6 of the menu).\n",
+               " close it with \"bookkeeping -C\" (or option 6 of the menu).\n",
                paint(COLOR_BOLD), paint(COLOR_RESET), book->year, book->month);
     }
 }
@@ -481,6 +445,43 @@ static int ask_entry_fields(const Book *book, Entry *entry)
     return ask_date(book, old.day, &entry->day);
 }
 
+static bool has_value_update(const Book *book, const char *category)
+{
+    for (size_t i = 0; i < book->entry_count; i++)
+    {
+        if (book->entries[i].type == ENTRY_INVEST_VALUE && strcasecmp(book->entries[i].category, category) == 0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// after every investment entry: what the investment is worth now and what it has gained or lost so far this month
+static int print_investment_result(const Book *book, const char *category)
+{
+    MonthSummary summary;
+    int status = compute_summary(book, &summary);
+
+    if (status == 0)
+    {
+        const CategoryTotals *totals = &summary.categories[find_category(book, category)];
+
+        printf("  %s is now worth ", category);
+        print_money(totals->closing, false);
+        printf(", gain/loss so far this month: ");
+        print_money(totals->gain, true);
+        printf(" (%+.2f%%)\n", return_percentage(totals));
+        if (!has_value_update(book, category))
+        {
+            printf("  No value update this month yet, so the value only moved by what you put in or took out (no gain).\n"
+                   "  Record what it is worth with a value update to get the real gain or loss.\n");
+        }
+    }
+    free_summary(&summary);
+    return status;
+}
+
 static int save_new_entry(Book *book, Entry *entry)
 {
     int status = ledger_add_entry(book, entry);
@@ -488,8 +489,35 @@ static int save_new_entry(Book *book, Entry *entry)
     {
         printf("Saved:\n");
         print_entry(book, entry);
+        if (type_uses_category(entry->type) && type_kind(entry->type) == KIND_INVESTMENT)
+        {
+            status = print_investment_result(book, entry->category);
+        }
     }
     return status;
+}
+
+// what each investment entry means, shown when the user picks one of them in the menu
+static void explain_investments(EntryType type)
+{
+    printf("How investments work: you record the money you put in (contributions), the money you take out\n"
+           "(withdrawals) and, from time to time, what the investment is WORTH (value updates). The program\n"
+           "works out the gain or loss: closing value - opening value - contributions + withdrawals.\n");
+
+    if (type == ENTRY_INVEST)
+    {
+        printf("A contribution is money moved from your cash into the investment: it is not a gain.\n");
+    }
+    else if (type == ENTRY_INVEST_WITHDRAW)
+    {
+        printf("A withdrawal moves money back to your cash: it is not a loss. If you spent it, also record that expense.\n");
+    }
+    else
+    {
+        printf("Write the TOTAL value your bank or broker shows today (what you put in + what it has earned or lost),\n"
+               "not only what you put in. Only the latest value update of the month counts.\n");
+    }
+    printf("Example and details: bookkeeping -h features\n\n");
 }
 
 // asks the item name (or the category) of the next entry of the loop; "done", the default, ends the loop with ADD_DONE
@@ -555,6 +583,10 @@ static int add_entries(Book *book, EntryType type)
     int day = default_day(book);
 
     print_title(type_label(type));
+    if (type_uses_category(type) && type_kind(type) == KIND_INVESTMENT)
+    {
+        explain_investments(type);
+    }
     printf("Add as many as you need, each one is saved at once.\n"
            "Press enter (or write \"done\") at the %s prompt when you are finished.\n",
            type_uses_category(type) ? "category" : "item name");
@@ -603,7 +635,8 @@ static int menu_add(Book *book)
         printf("What do you want to record?\n");
         for (int i = 0; i < ENTRY_TYPE_COUNT; i++)
         {
-            printf("  %d) %s\n", i + 1, type_label((EntryType)i));
+            printf("  %d) %s%s\n", i + 1, type_label((EntryType)i),
+                   i == ENTRY_INVEST_VALUE ? " (what it is worth today: this is how gains and losses are recorded)" : "");
         }
         printf("  %d) Back to the main menu\n\n", ENTRY_TYPE_COUNT + 1);
 
@@ -1005,7 +1038,7 @@ static int run_menu(Book *book)
 
             case 7:
                 print_title("Help");
-                print_help();
+                print_help(NULL);
                 break;
 
             default:
@@ -1030,7 +1063,10 @@ static int wizard_categories(Book *book, CategoryKind kind)
     }
     else
     {
-        printf("\nNow your investment categories (e.g. an index fund), with their total value at the start of the month.\n\n");
+        printf("\nNow your investment categories (e.g. an index fund), with what each one is worth at the start of the month:\n"
+               "its total value (what you put in + what it has earned or lost), as your bank or broker shows it.\n"
+               "During the month you'll record contributions, withdrawals and value updates, and the program works out\n"
+               "the gain or loss (see \"bookkeeping -h features\").\n\n");
     }
 
     while (1)
@@ -1083,6 +1119,7 @@ static int wizard_categories(Book *book, CategoryKind kind)
 static int run_wizard(Book *book)
 {
     char month[SIZE_PROMPT];
+    bool has_cash = false;
     bool negative = false; // to know the sign of the opening cash, if necessary
     long long cash = 0;
     int year = 0;
@@ -1093,7 +1130,7 @@ static int run_wizard(Book *book)
     get_today(&year, &number, &day);
     snprintf(month, sizeof(month), "%04d-%02d", year, number);
     printf("%s=== Welcome to the setup for new users ===%s\nNo data was found in \"%s/data\", let's set things up.\n"
-           "(Run \"bookkeeping help\" any time to see how everything works.)\n\n", paint(COLOR_BOLD), paint(COLOR_RESET), book->dir);
+           "(Run \"bookkeeping -h\" any time to see how everything works.)\n\n", paint(COLOR_BOLD), paint(COLOR_RESET), book->dir);
 
     // a loop to ask for the month until the user writes the required input, aka "YYYY-MM" with a month between 1 and 12
     while (1)
@@ -1112,12 +1149,16 @@ static int run_wizard(Book *book)
         }
     }
 
-    printf("\nOpening cash: the money you have at the start of %s %04d besides savings and investments.\n",
-           month_name(book->month), book->year);
-    status = ask_sign(&negative);
-    if (status == 0)
+    printf("\nOpening cash: the money you have at the start of %s %04d besides savings and investments\n"
+           "(e.g. your bank account and your wallet).\n\n", month_name(book->month), book->year);
+    status = ask_choose("Do you have any opening cash?", 'y', &has_cash);
+    if (status == 0 && has_cash)
     {
-        status = ask_amount("Opening cash amount, e.g. 1234.56", "0", true, &cash);
+        status = ask_sign(&negative);
+    }
+    if (status == 0 && has_cash)
+    {
+        status = ask_amount("Opening cash amount, e.g. 1234.56", NULL, false, &cash);
     }
     if (status == 0)
     {
@@ -1153,13 +1194,17 @@ static int command_add(Book *book, int argc, char **argv)
 
     for (int i = 0; i < argc; i++)
     {
-        if (strcmp(argv[i], "--date") == 0)
+        if (matches(argv[i], "--date|-d"))
         {
             if (i + 1 >= argc)
             {
-                return usage("--date needs a date (YYYY-MM-DD or the day of the month)");
+                return usage("-d, --date needs a date (YYYY-MM-DD or the day of the month)");
             }
             date = argv[++i];
+        }
+        else if (strncmp(argv[i], "--date=", 7) == 0)
+        {
+            date = argv[i] + 7;
         }
         else if (count < 3)
         {
@@ -1167,13 +1212,13 @@ static int command_add(Book *book, int argc, char **argv)
         }
         else
         {
-            return usage("add takes <type> <item|category> <amount> [--date YYYY-MM-DD]");
+            return usage("-a, --add takes <type> <item|category> <amount> [-d YYYY-MM-DD]");
         }
     }
 
     if (count != 3)
     {
-        return usage("add takes <type> <item|category> <amount> [--date YYYY-MM-DD]");
+        return usage("-a, --add takes <type> <item|category> <amount> [-d YYYY-MM-DD]");
     }
 
     if (parse_type(positional[0], &entry.type) != 0)
@@ -1264,7 +1309,7 @@ static int command_categories(Book *book, int argc, char **argv)
         return show_categories(book);
     }
 
-    if (strcmp(argv[0], "add") == 0 && (argc == 3 || argc == 4))
+    if (matches(argv[0], "add|--add|-a") && (argc == 3 || argc == 4))
     {
         Category category = { 0 };
         if (parse_kind(argv[1], &category.kind) != 0)
@@ -1283,7 +1328,7 @@ static int command_categories(Book *book, int argc, char **argv)
         snprintf(category.name, sizeof(category.name), "%s", argv[2]);
         status = ledger_add_category(book, &category);
     }
-    else if (strcmp(argv[0], "rename") == 0 && argc == 3)
+    else if (matches(argv[0], "rename|--rename|-n") && argc == 3)
     {
         status = lookup_category(book, argv[1], &index);
         if (status == 0 && strlen(argv[2]) > MAX_NAME_LEN)
@@ -1296,7 +1341,7 @@ static int command_categories(Book *book, int argc, char **argv)
             status = ledger_rename_category(book, index, argv[2]);
         }
     }
-    else if (strcmp(argv[0], "delete") == 0 && argc == 2)
+    else if (matches(argv[0], "delete|--delete|-r") && argc == 2)
     {
         status = lookup_category(book, argv[1], &index);
         if (status == 0)
@@ -1313,7 +1358,7 @@ static int command_categories(Book *book, int argc, char **argv)
             printf("Nothing was deleted.\n");
         }
     }
-    else if (strcmp(argv[0], "set-opening") == 0 && argc == 3)
+    else if (matches(argv[0], "set-opening|--set-opening|-o") && argc == 3)
     {
         long long cents = 0;
         status = lookup_category(book, argv[1], &index);
@@ -1362,37 +1407,37 @@ static int dispatch(Book *book, int argc, char **argv)
     const char *command = argv[1];
     int id = 0;
 
-    if (strcmp(command, "add") == 0)
+    if (matches(command, "add|--add|-a"))
     {
         return command_add(book, argc - 2, argv + 2);
     }
-    if (strcmp(command, "categories") == 0)
+    if (matches(command, "categories|--categories|-c"))
     {
         return command_categories(book, argc - 2, argv + 2);
     }
-    if (strcmp(command, "list") == 0 && argc == 2)
+    if (matches(command, "list|--list|-l") && argc == 2)
     {
         return print_entries(book);
     }
-    if (strcmp(command, "summary") == 0 && argc == 2)
+    if (matches(command, "summary|--summary|-s") && argc == 2)
     {
         return show_summary(book);
     }
-    if (strcmp(command, "close") == 0 && argc == 2)
+    if (matches(command, "close|--close|-C") && argc == 2)
     {
         return run_close(book);
     }
-    if (strcmp(command, "opening-cash") == 0 && argc == 3)
+    if (matches(command, "opening-cash|--opening-cash|-o") && argc == 3)
     {
         return command_opening_cash(book, argv[2]);
     }
-    if ((strcmp(command, "edit") == 0 || strcmp(command, "delete") == 0) && argc == 3)
+    if ((matches(command, "edit|--edit|-e") || matches(command, "delete|--delete|-r")) && argc == 3)
     {
         if (!parse_id(argv[2], &id))
         {
             return usage("the ID of an entry is a positive number");
         }
-        return command[0] == 'e' ? edit_entry(book, id) : delete_entry(book, id);
+        return matches(command, "edit|--edit|-e") ? edit_entry(book, id) : delete_entry(book, id);
     }
     return usage("unknown command or wrong number of arguments");
 }
@@ -1411,13 +1456,13 @@ int run_cli(int argc, char **argv)
 
     memset(&book, 0, sizeof(book));
 
-    if (argc >= 2 && (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0))
+    // the help works before any setup, with an optional topic: flags or features
+    if (argc >= 2 && matches(argv[1], "help|--help|-h"))
     {
-        if (argc != 2)
+        if (argc > 3 || print_help(argc == 3 ? argv[2] : NULL) != 0)
         {
-            return usage("help takes no arguments");
+            return usage("the help takes no topic, \"flags\" or \"features\"");
         }
-        print_help();
         return 0;
     }
 

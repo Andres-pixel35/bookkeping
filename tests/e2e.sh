@@ -75,8 +75,8 @@ mkdir "$DIR/interrupted"
 BOOKKEEPING_DIR="$DIR/interrupted" run $ERR_EOF '\ny\n'
 [ -e "$DIR/interrupted/data/state.csv" ] && fail "an interrupted wizard left a data/state.csv"
 
-# 2. the wizard with user-named categories, then Quit (8) from the menu
-run 0 '\ny\n1000\nEmergency fund\n500\nNew laptop\n200\ndone\nIndex fund\n1000\nCrypto coins\n500\n\n8\n'
+# 2. the wizard (opening cash: yes, positive, 1000) with user-named categories, then Quit (8) from the menu
+run 0 '\ny\ny\n1000\nEmergency fund\n500\nNew laptop\n200\ndone\nIndex fund\n1000\nCrypto coins\n500\n\n8\n'
 contains "$DIR/data/categories.csv" "saving,Emergency fund,50000"
 contains "$DIR/data/categories.csv" "investment,Crypto coins,50000"
 contains "$DIR/data/state.csv" "$M,100000"
@@ -131,7 +131,7 @@ run 0 '' summary
 # 6b. the menu's add loop: many entries of one type in a row, done goes back to the list of types (not the main menu),
 #     the date of each entry defaults to the previous one, and a refused withdrawal doesn't end the loop
 mkdir "$DIR/loop"
-LOOP_INPUT='\ny\n0\nPiggy bank\n100\n\n\n'           # wizard: one saving category, no investments
+LOOP_INPUT='\nn\nPiggy bank\n100\n\n\n'             # wizard: no opening cash, one saving category, no investments
 LOOP_INPUT="$LOOP_INPUT"'1\n2\ncoffee\n3.50\n03\nlunch\n12\n\n\n'  # Add entries > Expense: two items, the 2nd keeps day 03, done
 LOOP_INPUT="$LOOP_INPUT"'4\n1\n20\n04\nPiggy bank\n5\n\n\n'      # Saving deposit by number and by name, done
 LOOP_INPUT="$LOOP_INPUT"'5\n1\n500\n05\n\n'                      # Saving withdrawal over the balance: refused, still in the loop
@@ -143,6 +143,51 @@ contains "$DIR/loop/data/$M.csv" "3,$M-04,saving,Piggy bank,,2000"
 contains "$DIR/loop/data/$M.csv" "4,$M-04,saving,Piggy bank,,500"
 lacks "$DIR/loop/data/$M.csv" "saving-withdraw"
 [ "$(grep -c "What do you want to record?" "$OUT")" -eq 4 ] || fail "the list of entry types was not shown again after each loop"
+
+# 6c. every command has a short, a long and a word form; -d/--date/--date= for the date
+contains "$DIR/loop/data/state.csv" "$M,0"   # the wizard answer "no opening cash" leaves it at 0
+L="$DIR/loop"
+BOOKKEEPING_DIR="$L" run 0 '' -a expense parking 4 -d 05
+BOOKKEEPING_DIR="$L" run 0 '' --add income tips 10 --date=06
+contains "$L/data/$M.csv" "5,$M-05,expense,,parking,400"
+contains "$L/data/$M.csv" "6,$M-06,income,,tips,1000"
+BOOKKEEPING_DIR="$L" run 0 '' -l
+BOOKKEEPING_DIR="$L" run 0 '' --list
+BOOKKEEPING_DIR="$L" run 0 '' -s
+BOOKKEEPING_DIR="$L" run 0 '' --summary
+BOOKKEEPING_DIR="$L" run 0 '\n\n7\n\n' -e 5
+contains "$L/data/$M.csv" "5,$M-05,expense,,parking,700"
+BOOKKEEPING_DIR="$L" run 0 'y\n' -r 6
+lacks "$L/data/$M.csv" "tips"
+BOOKKEEPING_DIR="$L" run $ERR_ENTRY '' --delete 99
+BOOKKEEPING_DIR="$L" run 0 '' -c -a investment "Gold bar" 100
+BOOKKEEPING_DIR="$L" run 0 '' --categories --rename "Gold bar" Gold
+BOOKKEEPING_DIR="$L" run 0 '' -c -o Gold 120
+contains "$L/data/categories.csv" "investment,Gold,12000"
+BOOKKEEPING_DIR="$L" run 0 '' -o -50
+contains "$L/data/state.csv" "$M,-5000"
+BOOKKEEPING_DIR="$L" run 0 '' --opening-cash 0
+BOOKKEEPING_DIR="$L" run $ERR_USAGE '' -x
+BOOKKEEPING_DIR="$L" run $ERR_USAGE '' -a expense food 5 -d
+
+# 6d. after every investment entry the value and the gain so far are printed
+BOOKKEEPING_DIR="$L" run 0 '' -a invest Gold 10 -d 04
+contains "$OUT" "Gold is now worth \$130.00, gain/loss so far this month: \$0.00 (+0.00%)"
+contains "$OUT" "No value update this month yet"
+BOOKKEEPING_DIR="$L" run 0 '' -a invest-value Gold 150 -d 05
+contains "$OUT" "Gold is now worth \$150.00, gain/loss so far this month: +\$20.00 (+15.38%)"
+
+# 6e. the three help pages
+"$BIN" -h >"$DIR/help-all.txt" 2>&1 || fail "-h failed"
+"$BIN" --help flags >"$DIR/help-flags.txt" 2>&1 || fail "--help flags failed"
+"$BIN" help features >"$DIR/help-features.txt" 2>&1 || fail "help features failed"
+contains "$DIR/help-all.txt" "COMMANDS AND FLAGS"
+contains "$DIR/help-all.txt" "INVESTMENTS: HOW GAINS AND LOSSES ARE RECORDED"
+contains "$DIR/help-flags.txt" "-a, --add, add <type>"
+lacks "$DIR/help-flags.txt" "INVESTMENTS: HOW"
+contains "$DIR/help-features.txt" "INVESTMENTS: HOW GAINS AND LOSSES ARE RECORDED"
+lacks "$DIR/help-features.txt" "COMMANDS AND FLAGS"
+run $ERR_USAGE '' -h bogus
 
 # 7. the end of the input never hangs: at the menu it is a normal exit, in the middle of an edit it is ERR_EOF
 run 0 ''
