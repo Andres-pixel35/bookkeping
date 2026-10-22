@@ -22,7 +22,7 @@ static const char *USAGE =
     "                   | -a <type> <item|category> <amount> [-d YYYY-MM-DD]\n"
     "                   | -c [-a <saving|investment> <name> [<opening>] | -n <old> <new> | -r <name> | -o <name> <amount>]\n"
     "                   | -o [-]<amount>]\n"
-    "Every command also has a long and a word form (-a, --add, add). Run \"bookkeeping -h flags\" for the list.\n";
+    "Every command has a short and a long form (-a or --add). Run \"bookkeeping -h flags\" for the list.\n";
 
 static int usage(const char *why)
 {
@@ -37,7 +37,8 @@ static void print_title(const char *title)
     printf("\n%s--- %s ---%s\n\n", paint(COLOR_BOLD), title, paint(COLOR_RESET));
 }
 
-// arg is any of the names in names ("add|--add|-a"): every command has a word, a long and a short form
+// arg is exactly one of the names in names ("--add|-a"): a long name only with "--", a short one only with "-",
+// so "add", "-add" or "--a" are refused
 static bool matches(const char *arg, const char *names)
 {
     size_t len = strlen(arg);
@@ -1334,7 +1335,7 @@ static int command_categories(Book *book, int argc, char **argv)
         return show_categories(book);
     }
 
-    if (matches(argv[0], "add|--add|-a") && (argc == 3 || argc == 4))
+    if (matches(argv[0], "--add|-a") && (argc == 3 || argc == 4))
     {
         Category category = { 0 };
         if (parse_kind(argv[1], &category.kind) != 0)
@@ -1353,7 +1354,7 @@ static int command_categories(Book *book, int argc, char **argv)
         snprintf(category.name, sizeof(category.name), "%s", argv[2]);
         status = ledger_add_category(book, &category);
     }
-    else if (matches(argv[0], "rename|--rename|-n") && argc == 3)
+    else if (matches(argv[0], "--rename|-n") && argc == 3)
     {
         status = lookup_category(book, argv[1], &index);
         if (status == 0 && strlen(argv[2]) > MAX_NAME_LEN)
@@ -1366,7 +1367,7 @@ static int command_categories(Book *book, int argc, char **argv)
             status = ledger_rename_category(book, index, argv[2]);
         }
     }
-    else if (matches(argv[0], "delete|--delete|-r") && argc == 2)
+    else if (matches(argv[0], "--delete|-r") && argc == 2)
     {
         status = lookup_category(book, argv[1], &index);
         if (status == 0)
@@ -1387,7 +1388,7 @@ static int command_categories(Book *book, int argc, char **argv)
             printf("Nothing was deleted.\n");
         }
     }
-    else if (matches(argv[0], "set-opening|--set-opening|-o") && argc == 3)
+    else if (matches(argv[0], "--set-opening|-o") && argc == 3)
     {
         long long cents = 0;
         status = lookup_category(book, argv[1], &index);
@@ -1436,39 +1437,39 @@ static int dispatch(Book *book, int argc, char **argv)
     const char *command = argv[1];
     int id = 0;
 
-    if (matches(command, "add|--add|-a"))
+    if (matches(command, "--add|-a"))
     {
         return command_add(book, argc - 2, argv + 2);
     }
-    if (matches(command, "categories|--categories|-c"))
+    if (matches(command, "--categories|-c"))
     {
         return command_categories(book, argc - 2, argv + 2);
     }
-    if (matches(command, "list|--list|-l") && argc == 2)
+    if (matches(command, "--list|-l") && argc == 2)
     {
         print_notice(book);
         return print_entries(book);
     }
-    if (matches(command, "summary|--summary|-s") && argc == 2)
+    if (matches(command, "--summary|-s") && argc == 2)
     {
         print_notice(book);
         return show_summary(book);
     }
-    if (matches(command, "close|--close|-C") && argc == 2)
+    if (matches(command, "--close|-C") && argc == 2)
     {
         return run_close(book);
     }
-    if (matches(command, "opening-cash|--opening-cash|-o") && argc == 3)
+    if (matches(command, "--opening-cash|-o") && argc == 3)
     {
         return command_opening_cash(book, argv[2]);
     }
-    if ((matches(command, "edit|--edit|-e") || matches(command, "delete|--delete|-r")) && argc == 3)
+    if ((matches(command, "--edit|-e") || matches(command, "--delete|-r")) && argc == 3)
     {
         if (!parse_id(argv[2], &id))
         {
             return usage("the ID of an entry is a positive number");
         }
-        return matches(command, "edit|--edit|-e") ? edit_entry(book, id) : delete_entry(book, id);
+        return matches(command, "--edit|-e") ? edit_entry(book, id) : delete_entry(book, id);
     }
     return usage("unknown command or wrong number of arguments");
 }
@@ -1488,7 +1489,7 @@ int run_cli(int argc, char **argv)
     memset(&book, 0, sizeof(book));
 
     // the help works before any setup, with an optional topic: flags or features
-    if (argc >= 2 && matches(argv[1], "help|--help|-h"))
+    if (argc >= 2 && matches(argv[1], "--help|-h"))
     {
         if (argc > 3 || print_help(argc == 3 ? argv[2] : NULL) != 0)
         {

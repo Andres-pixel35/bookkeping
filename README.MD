@@ -95,31 +95,31 @@ Each action returns to the menu, and every screen starts with its own title so t
 
 ### Quick commands and flags
 
-Every command has three equivalent forms, the usual Linux short (`-a`) and long (`--add`) flags, plus the word (`add`):
+Every command has the usual Linux short and long forms: one dash with a letter (`-a`) or two dashes with the name (`--add`). Nothing else is accepted: a plain word (`add`), a name with one dash (`-add`) or a letter with two (`--a`) is refused with the usage line (exit code 198).
 
-| Short | Long | Word | What it does |
-|---|---|---|---|
-| `-a` | `--add` | `add` | `<type> <item\|category> <amount> [-d <date>]` records an entry (types below). |
-| `-l` | `--list` | `list` | Every entry of the open month, day by day, with its ID. |
-| `-s` | `--summary` | `summary` | Totals of the open month so far, with every category. |
-| `-e` | `--edit` | `edit` | `<id>` changes any field of an entry (Enter keeps the current value). |
-| `-r` | `--delete` | `delete` | `<id>` deletes (removes) an entry, after a y/n confirmation. |
-| `-c` | `--categories` | `categories` | Your categories with their opening balance and their balance now, or one of the actions below. |
-| `-o` | `--opening-cash` | `opening-cash` | `[-]<amount>` fixes the opening cash of the open month. |
-| `-C` | `--close` | `close` | Preview, y/n confirmation, both reports, next month. |
-| `-h` | `--help` | `help` | `[flags\|features]` the help (see below). |
-| `-d` | `--date` | | `YYYY-MM-DD` or the day of the month, for `-a`; `--date=14` works too. |
+| Short | Long | What it does |
+|---|---|---|
+| `-a` | `--add` | `<type> <item\|category> <amount> [-d <date>]` records an entry (types below). |
+| `-l` | `--list` | Every entry of the open month, day by day, with its ID. |
+| `-s` | `--summary` | Totals of the open month so far, with every category. |
+| `-e` | `--edit` | `<id>` changes any field of an entry (Enter keeps the current value). |
+| `-r` | `--delete` | `<id>` deletes (removes) an entry, after a y/n confirmation. |
+| `-c` | `--categories` | Your categories with their opening balance and their balance now, or one of the actions below. |
+| `-o` | `--opening-cash` | `[-]<amount>` fixes the opening cash of the open month. |
+| `-C` | `--close` | Preview, y/n confirmation, both reports, next month. |
+| `-h` | `--help` | `[flags\|features]` the help (see below). |
+| `-d` | `--date` | `YYYY-MM-DD` or the day of the month, for `-a`; `--date=14` works too. |
 
-Actions of `-c` / `--categories` / `categories`:
+Actions of `-c` / `--categories`:
 
-| Short | Long | Word | What it does |
-|---|---|---|---|
-| `-a` | `--add` | `add` | `<saving\|investment> <name> [<opening amount>]` new category. |
-| `-n` | `--rename` | `rename` | `<old> <new>` renames it everywhere in the open month. |
-| `-r` | `--delete` | `delete` | `<name>` only when it started the month at 0 and has no entries; otherwise it is refused at once with every reason, and only an allowed delete asks y/n. |
-| `-o` | `--set-opening` | `set-opening` | `<name> <amount>` fixes the opening balance (or value) of a category. |
+| Short | Long | What it does |
+|---|---|---|
+| `-a` | `--add` | `<saving\|investment> <name> [<opening amount>]` new category. |
+| `-n` | `--rename` | `<old> <new>` renames it everywhere in the open month. |
+| `-r` | `--delete` | `<name>` only when it started the month at 0 and has no entries; otherwise it is refused at once with every reason, and only an allowed delete asks y/n. |
+| `-o` | `--set-opening` | `<name> <amount>` fixes the opening balance (or value) of a category. |
 
-**Help pages:** `-h` (or `--help`, `help`) shows everything; `-h flags` only the commands and flags; `-h features` only how things work (amounts, the open month, cash and net worth, investments with a worked example, files). On a terminal, section titles are bold and commands are green.
+**Help pages:** `-h` (or `--help`) shows everything; `-h flags` only the commands and flags; `-h features` only how things work (amounts, the open month, cash and net worth, investments with a worked example, files). On a terminal, section titles are bold and commands are green.
 
 Entry types:
 
@@ -137,7 +137,7 @@ Examples:
 ```sh
 ./bookkeeping -a expense food 25000
 ./bookkeeping --add expense "food, snacks" 12.50 --date 2026-10-14
-./bookkeeping add income salary 3000 -d 1             # day 1 of the open month
+./bookkeeping --add income salary 3000 -d 1           # day 1 of the open month
 ./bookkeeping -a saving "Emergency fund" 300
 ./bookkeeping -a invest "Index fund" 200
 ./bookkeeping -a invest-value "Index fund" 1260
@@ -161,7 +161,7 @@ Everything in the open month can still change: list the entries (`-l` or menu op
 
 ## Closing a month
 
-`bookkeeping -C` (or `--close`, `close`, or menu option 6) shows the preview summary and asks for confirmation. Then it:
+`bookkeeping -C` (or `--close`, or menu option 6) shows the preview summary and asks for confirmation. Then it:
 
 1. writes `reports/MM_YYYY_Personal_Report.md` and `reports/MM_YYYY.md`,
 2. carries the closing cash and the closing balance/value of every category forward,

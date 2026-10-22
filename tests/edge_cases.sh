@@ -136,7 +136,7 @@ run 0 '' -a expense food 10 -d 2024-02-29
 run 0 '' -a expense food 10 -d 29
 refuse $ERR_USAGE '' -a expense food 10 -d 2024-02-30
 refuse $ERR_USAGE '' -a expense food 10 -d 30
-run 0 'y\n' close
+run 0 'y\n' --close
 contains "$BOOKKEEPING_DIR/reports/02_2024_Personal_Report.md" "**Period:** 2024-02-01 to 2024-02-29"
 contains "$BOOKKEEPING_DIR/reports/02_2024_Personal_Report.md" "| 1 | food | \$20.00 | 100.00% |"
 contains "$BOOKKEEPING_DIR/data/state.csv" "2024-03,378000"
@@ -189,13 +189,31 @@ refuse $ERR_USAGE '' bogus
 refuse $ERR_USAGE '' ''
 refuse $ERR_USAGE '' --
 said "Usage: bookkeeping"
+# only "-x" and "--long" are commands: a plain word, a long name with one dash or a short one with two are refused
+for command in 'add expense food 5 -d 1' list summary 'edit 1' 'delete 1' categories 'opening-cash 5' close help \
+               '-add expense food 5 -d 1' -list -summary '-edit 1' '-delete 1' -categories '-opening-cash 5' -close -help \
+               '--a expense food 5 -d 1' --l --s '--e 1' '--r 1' --c '--o 5' --C --h -L --LIST
+do
+    refuse $ERR_USAGE '' $command
+done
+said "Usage: bookkeeping"
+for action in 'add saving Gold' 'rename Stocks Shares' 'delete Stocks' 'set-opening Stocks 5' \
+              '-add saving Gold' '-rename Stocks Shares' '-delete Stocks' '-set-opening Stocks 5' \
+              '--a saving Gold' '--n Stocks Shares' '--r Stocks' '--o Stocks 5'
+do
+    refuse $ERR_USAGE 'y\n' -c $action
+done
+for date in 'date 1' '-date 1' '-date=1' '--d 1' 'd 1'; do
+    refuse $ERR_USAGE '' -a expense food 5 $date
+done
+refuse $ERR_USAGE '' -a expense food 5 -d=1
 refuse $ERR_USAGE '' -l extra
 refuse $ERR_USAGE '' -s extra
 refuse $ERR_USAGE '' -C extra
 refuse $ERR_USAGE '' -o
 refuse $ERR_USAGE '' -h bogus
 refuse $ERR_USAGE '' -h flags extra
-run 0 '' help
+run 0 '' --help
 
 # IDs
 refuse $ERR_USAGE '' -e
