@@ -380,9 +380,11 @@ int check_balances(const Book *book)
     {
         char wanted[SIZE_MONEY];
         char available[SIZE_MONEY];
+        char date[SIZE_MONEY];
         format_money(summary.violation->amount, false, wanted, sizeof(wanted));
         format_money(summary.available, false, available, sizeof(available));
-        insufficient_balance(summary.violation->category, wanted, available);
+        snprintf(date, sizeof(date), "%04d-%02d-%02d", book->year, book->month, summary.violation->day);
+        insufficient_balance(summary.violation->category, wanted, date, available);
     }
 
     free_summary(&summary);

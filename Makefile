@@ -1,6 +1,6 @@
 # make        release build (-O2) of ./bookkeeping
 # make debug  build/debug/bookkeeping with -g and the address/undefined sanitizers
-# make test   unit tests and tests/e2e.sh, everything built with -fsanitize=address,undefined -g
+# make test   unit tests, tests/e2e.sh and tests/edge_cases.sh, everything built with -fsanitize=address,undefined -g
 #             (the release binary is only used for the out-of-memory check, see tests/e2e.sh)
 # make clean  removes everything that was built
 
@@ -41,6 +41,7 @@ build/test/test_%: tests/test_%.c tests/test_util.h $(LIB_SRC) $(HEADERS)
 test: build/test/bookkeeping bookkeeping $(TESTS)
 	@for t in $(TESTS); do echo "== $$t"; ./$$t || exit 1; done
 	sh tests/e2e.sh build/test/bookkeeping bookkeeping
+	sh tests/edge_cases.sh build/test/bookkeeping
 
 clean:
 	rm -rf bookkeeping build

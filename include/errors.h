@@ -38,7 +38,7 @@ void date_outside_month(const char *input, int year, int month);
 void no_default_date(int year, int month);
 void month_not_started(int year, int month);
 void invalid_type(const char *input);
-void insufficient_balance(const char *category, const char *wanted, const char *available);
+void insufficient_balance(const char *category, const char *wanted, const char *date, const char *available);
 void unknown_category(const char *name, const char *kind);
 void category_exists(const char *name);
 void category_not_empty(const char *name, const char *balance);

@@ -173,11 +173,13 @@ void invalid_type(const char *input)
     red(0);
 }
 
-void insufficient_balance(const char *category, const char *wanted, const char *available)
+// the withdrawal named is the one that would go over its balance: the one being added, or a later one that a change
+// (a new withdrawal before it, a deleted deposit...) would leave without enough money
+void insufficient_balance(const char *category, const char *wanted, const char *date, const char *available)
 {
     red(1);
-    fprintf(stderr, "ERROR: You haven't that amount of money in \"%s\", you tried to withdraw \"%s\", but at that point you only have: \"%s\".\n"
-                    "Please try again.\n", category, wanted, available);
+    fprintf(stderr, "ERROR: You haven't that amount of money in \"%s\": the withdrawal of \"%s\" on %s needs it,\n"
+                    "but at that point there would only be: \"%s\". Please try again.\n", category, wanted, date, available);
     red(0);
 }
 
